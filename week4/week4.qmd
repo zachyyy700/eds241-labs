@@ -1,0 +1,362 @@
+---
+title: "Lab Week 4: Statistical Matching + Fixed Effects"
+subtitle: "A replication of study analysis in Ahmadia (2015)"
+author: "EDS 241 / ESM 244"
+format:
+  html:
+    theme: sketchy
+    css: styles.css
+date: "January 29, 2026"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
+```
+
+
+------------------------------------------------------------------------
+
+## Lab Outline
+
+0. Load in the packages and data
+1. Take a look at focal variables 
+2. Checking covariate imbalance (pre‑matching).
+3. Conduct a matching analysis (Mahalanobis matching)
+4. Evaluate balance after matching
+5. Estimate regression models for each outcome using the matched sample
+6. Practice fixed effects estimation
+
+------------------------------------------------------------------------
+
+## Applied study & data source
+
+This lab uses open-access replication data from:
+
+> Ahmadia, G. N., Glew, L., Provost, M., Gill, D., Hidayat, N. I., Mangubhai, S., Purwanto, P., Fox, H. E. (2015). *Integrating impact evaluation in the design and implementation of monitoring marine protected areas*. Philosophical Transactions of the Royal Society B.
+
+**Big idea:** MPAs are *not randomly placed*. They may be placed in “better” locations which means that treated and control groups are unlikely to make an *apples-to-apples* comparison. AKA, we are up against the nearly universal causal inference problem with non-experimental data, treatment assignment selection bias.
+
+Ahmadia et al. (2015) uses **statistical matching** to construct a more *apples-to-apples* comparison group. In this lab exercise we will approximately replicate the main matching analysis conducted in this study. 
+
+::: callout-note
+NOTE: When matching, the authors imposed additional restrictions (caliper-style constraints) on some habitat variables. We **do not** fully replicate those constraints here.
+:::
+
+------------------------------------------------------------------------
+
+### Reading reference:
+
+> MatchIt Vignette: <https://kosukeimai.github.io/MatchIt/articles/MatchIt.html>
+
+------------------------------------------------------------------------
+
+## 0. Load packages + study data 
+
+```{r}
+library(tidyverse)   # data wrangling + plotting
+library(here)        # portable file paths (project-root relative)
+library(janitor)     # clean variable names
+library(gtsummary)   # clean summary tables
+library(gt)          # optional: render gtsummary nicely
+library(MatchIt)     # matching estimation
+library(cobalt)      # balance checks + love plots
+library(jtools)      # clean regression output summaries
+```
+
+Read in the cleaned survey data
+```{r}
+
+data_clean <- read_csv(here("week4", "Ahmadia_2015_DataClean.csv"), show_col_types = FALSE)
+```
+
+
+
+------------------------------------------------------------------------
+
+## 1. Create variable description table for key variables in the matching analysis 
+
+```{r}
+#| echo: false
+
+variable_descriptions <- tribble(
+  ~ "Label" , ~"Description",
+  #---------|--------------|,
+  "treated_mpa (Treatment)","Site is inside a Marine Protected Area (1 = inside MPA , 0 = outside MPA).",
+  "biomass_fisheries (Outcome)", "Biomass of key fisheries families (Serranidae, Lutjanidae, Haemulidae) measured in kg per hectare (kg/ha).",
+  "biomass_ecological (Outcome)", "Biomass of herbivorous fish families (Acanthuridae, Scaridae, Siganidae) measured in kg per hectare (kg/ha).",
+  "dist_deep_water (Covariate)", "Covariate: Distance to deep water (50 m depth contour), in meters (m).",
+  "ssta_freq (Covariate)", "Frequency of sea-surface temperature anomalies (SSTA)",
+  "reef_exposure (Covariate)", "Reef wave exposure (Exposed, Semi-exposed, Sheltered).",
+  "reef_slope (Covariate)", "Reef slope (Flat, Slope, Wall)",
+  "reef_type (Covariate)", "Reef type (Patch, Fringing, Barrier, Atoll).",
+  "dist_mangroves (Covariate)", "Distance to nearest mangrove habitat, in meters (m).",
+  "dist_fishing_settlement (Covariate)", "Distance to nearest fishing settlement, in meters (m).",
+  "dist_market (Covariate)", "Distance to primary market, in meters (m).",
+  "pollution_risk (Covariate)", "Watershed pollution risk. (1 = Low; 2 = Medium; 3 = High).",
+  "monsoon_direction (Covariate)", "Monsoon wind exposure direction. (Northwest (NW), Southeast (SE)).")
+
+gt(variable_descriptions) %>%
+  tab_header(
+    title = "Variable Descriptions (Treatment, Outcomes, Matching Covariates) - Ahmadia (2015)"
+  ) %>%
+  tab_style(
+    style = cell_text(weight = "bold"),
+    locations = cells_column_labels()
+  )
+```
+
+
+------------------------------------------------------------------------
+
+## 2. Check imbalance before matching (covariate balance table)
+
+**Goal:** Compare covariate distributions between `treated_mpa` and control sites *before* matching.
+
+```{r}
+
+data_clean %>%
+  select(
+    treated_mpa, dist_to_deep_water, ssta_freq, reef_exposure,
+    reef_slope, reef_type,
+    dist_mangroves, dist_fish_settl, dist_market,
+    pollution_risk, monsoon_direction) %>%
+  tbl_summary(
+    by = treated_mpa,
+    statistic = list(
+      all_continuous() ~ "{mean} ({sd})",
+      all_categorical() ~ "{n} ({p}%)"
+    )
+  ) %>%
+  modify_header(label ~ "**Covariate**") %>%
+  modify_spanning_header(c("stat_1", "stat_2") ~ "**Group**")
+```
+
+### ✅ Your turn (write answers in the lab)
+
+**Q1.** Based on the balance table, name two covariates that look most different between MPA and non-MPA sites.
+
+*Response:* Reef type & dist_fish_settl, large differences between treatment and control.
+
+**Q2.** Pick one of those imbalanced covariates and explain why it might confound the estimate of the effect of MPAs on fish biomass.
+
+*Response:* Reef type could confound the effect on fish biomass because each reef type has its own characteristics. Ideally, we'd want to compare equal amounts of each reef type.
+
+------------------------------------------------------------------------
+
+## Matching plan (what are we trying to estimate?)
+
+In `{MatchIt}`, most distance-based matching procedures (like nearest-neighbor matching) target is to estimate:
+
+> `ATT`: Average Treatment effect on the Treated
+
+Why? When using matching methods we typically **keep treated units** and then select control units that most closely match them. 
+
+### ✅ Your turn
+
+**Q4.** What does `ATT` mean in the context of this MPA evaluation setting?
+
+*Response:* The average treatment effect on MPA sites
+
+------------------------------------------------------------------------
+
+## 3. Mahalanobis Matching 
+
+Matching criteria used in Ahmadia (2015)
+
+- `method = "nearest-neighbor"`: Nearest neighbor matching
+- `distance = "mahalanobis"`: Mahalanobis distance 
+- `ratio = 2`: Two controls matched to each treated unit (2:1 ratio; control/treated)
+- `replace = TRUE`: Controls can be reused (matched to multiple treated units)
+
+> NOTE: This is the *main* matching method implemented in Ahmadia (2015) with the exception of the caliper-style constraints.
+
+```{r}
+# 1) Set a seed for reproducible matching
+set.seed(2412026)
+
+# 2) Fit a nearest-neighbor Mahalanobis matching model
+match_model <- matchit(
+  treated_mpa ~ dist_to_deep_water + ssta_freq + reef_exposure +
+    reef_slope + reef_type + dist_mangroves + dist_fish_settl +
+    dist_market + pollution_risk + monsoon_direction,
+  data = data_clean,
+  method = "nearest",         # Nearest neighbor matching
+  distance = "mahalanobis",   # Mahalanobis distance 
+  ratio = 2,                  # 2:1 control/treated ratio)
+  replace = TRUE )            # With replacement 
+
+match_model
+```
+
+```{r}
+# Extract matched dataset
+matched_data <- match.data(match_model)
+```
+
+```{r}
+# Inspect matching summary
+summary(match_model)
+```
+
+### ✅ Your turn
+
+**Q5.** Report how many treated units were matched and how many control sites were included in the matched data.
+
+*Response:* 108 treatment sites and 37 control sites.
+
+**Q6.** Find the covariate with the largest standardized mean difference (SMD) *after matching*. Which covariate is it?
+
+*Response:* Distance to deep water.
+
+Visualize balance on the covariates using `plot()` with `type = "density"`
+
+```{r}
+plot(match_model, type = "density", interactive = FALSE,
+     which.xs = ~dist_to_deep_water + ssta_freq + reef_exposure)
+```
+
+------------------------------------------------------------------------
+
+## 4. Evaluate balance after matching (love plot + balance table)
+
+```{r}
+# Create nicer variable labels for plots/tables
+nice_names <- data.frame(
+  old = c(
+    "dist_to_deep_water", "ssta_freq", "reef_exposure", "reef_slope",
+    "reef_type", "dist_mangroves", "dist_fish_settl", "dist_market",
+    "pollution_risk", "monsoon_direction"),
+  new = c(
+    "Distance to deep water", "SSTA frequency", "Reef exposure", "Reef slope",
+    "Reef type", "Distance to mangroves (m)", "Distance to fishing settlement (m)",
+    "Distance to market (m)", "Watershed pollution risk", "Monsoon direction (SE/NW)"))
+```
+
+Create a `Love plot` to visualize standardized mean differences (before & after matching)
+```{r}
+love.plot(
+  match_model,
+  stats = "mean.diffs",
+  thresholds = c(m = 0.1),
+  var.names = nice_names
+)
+```
+
+------------------------------------------------------------------------
+
+## 5. Estimate differences in outcomes using the matched sample
+
+- When matching *with replacement*, some control sites were matched multiple times and receive larger weights.  
+- So we estimate outcome differences using the `weights` provided by `match.data()`.
+
+Regression (Outcome 1): Herbivorous fisheries families biomass
+```{r}
+reg_ecological <- lm(biomass_ecological ~ treated_mpa, data = matched_data, weights = weights)
+
+summ(reg_ecological, model.fit = FALSE)
+```
+
+Regression (Outcome 2): Key fisheries families biomass
+```{r}
+
+reg_fisheries <- lm(biomass_fisheries ~ treated_mpa, data = matched_data, weights = weights)
+
+summ(reg_fisheries, model.fit = FALSE)
+```
+
+View biomass differences by treatment group as simple weighted mean comparisons:
+
+```{r}
+
+matched_data %>%
+  group_by(treated_mpa) %>%
+  summarize(
+    n_obs = n(),
+    avg_biomass_ecological = weighted.mean(biomass_ecological, w = weights),
+    avg_biomass_fisheries  = weighted.mean(biomass_fisheries,  w = weights),
+    .groups = "drop") %>%
+  gt() %>%
+  tab_header(title = "Weighted mean outcomes in matched sample")
+
+```
+
+### ✅ Your turn
+
+**Q7.** Interpret one coefficient from the regressions above (choose ecological *or* fisheries). Write the interpretation of coefficient in plain language.
+
+*Response:* The treatment is about 107.78 kg/ha more biomass than controls sites.
+
+**Q8.** What is the biggest remaining threat to causal interpretation of regression coefficients after matching?
+
+*Response:* Unobserved confounding variables that haven't been accounted for.
+
+------------------------------------------------------------------------
+
+## 6. Fixed Effects Estimation - An Applied Example 
+
+**Replication of fixed effects estimator from applied study:**
+
+Dudney, J., Willing, C. E., Das, A. J., Latimer, A. M., Nesmith, J. C., & Battles, J. J. (2021). *Nonlinear shifts in infectious rust disease due to climate change.* Nature communications, 12(1), 5102.
+
+::: callout
+
+> In this section we will look at a simple fixed effects (FE) example using panel-style data, where the same units (plots) are observed over multiple years (1995, 2016).
+
+> The key issue: observations from the same plot are likely to share stable characteristics (soil type, microclimate, slope, management history) that we don’t measure well—and those unobserved factors can bias a naïve regression.
+
+:::
+
+------------------------------------------------------------------------
+
+## Read in the data & change fixed effext to `factor variables`
+
+> By Coding `plot` and `year` as factors lets us include them as indicator (dummy) variables in an FE regression.
+
+
+```{r}
+data_fe <- read_csv(here("week4", "Dudney2021_study_data.csv"), show_col_types = FALSE) |> 
+  mutate(year = factor(year), plot = factor(plot))
+```
+
+
+## Estimate a “no fixed effects” baseline model
+
+```{r}
+mod1_nofe <- lm(perinc ~ vpd + I(vpd^2) + dbh + density,
+             data = data_fe)
+
+summ(mod1_nofe, model.fit = FALSE, digits = 3)
+```
+
+## Estimate the fixed effects model: Add in the fixed effects for `plot` & `year`
+
+- `plot` fixed effects absorb all time-invariant differences across plots (e.g., baseline soil quality)
+- `year` fixed effects absorb common shocks shared by all plots in a given year (e.g., a region-wide drought year)
+
+```{r}
+fe_lm <- lm(perinc ~ vpd + I(vpd^2) + dbh + density + plot + year,
+             data = data_fe)
+
+summ(fe_lm, model.fit = FALSE, digits = 3)
+```
+
+### ✅ Your turn
+
+**Q9.** Compare the coefficient on `vpd` in the `no-FE model` vs the `FE model`. Did the estimate get larger, smaller, or change sign? What does that suggest about confounding from unobserved plot differences?
+
+*Response:* Vpd got larger by about 2, which suggests that the fixed effects (plot or year) did seem to confound our effect.
+
+**Q10.** Why include `year` fixed effects? Give one concrete example of a “year shock” that could bias estimates if not controlled (choose a different example than provided above).
+
+*Response:* El Nino year perhaps.
+
+**Q11.** Why include `plot` fixed effects? Give one concrete example of a “time-invariant plot difference” that could bias estimates if not controlled (choose a different example than provided above).
+
+*Response:* Different soil nutrient variation in different plots.
+
+
+
+------------------------------------------------------------------------
+
+------------------------------------------------------------------------
+
