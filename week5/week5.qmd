@@ -1,0 +1,312 @@
+---
+title: "Lab Week 5: Regression Discontinuity Designs (RDD)"
+subtitle: "Evaluating Forest Conservation with RDD"
+author: "EDS 241 / ESM 244"
+format:
+  html
+date: "February 6, 2026"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
+```
+
+
+
+## RDD Review 
+
+Regression Discontinuity Design is a natural experimental method used to estimate the causal effects of a treatment by exploiting a "cutoff" or "threshold" in an assignment variable. 
+
+- The running variable ($X$): A continuous measure used for assignment
+
+- The Cutoff ($c$): The threshold rule
+
+- Treatment rule ($D$): What changes at the cutoff (policy / intervention)
+
+
+
+
+
+
+## Study Review:  "Environmental Regulation and Economic Performance: Evidence from Forest Conservation in Mexico"
+
+
+This lab replicates the analysis from Neal (2024), which examines how effective government-protected forest areas are at preventing deforestation globally from 2000-2022. Using satellite data covering 7.4 billion forest observations and a regression discontinuity design, the study addresses a critical policy question:
+
+> **Does legal protection actually prevent forests from being cleared?**
+
+We will use simulated data to approximate the study estimates. The results should not be interpreted literally as simulated data necessarily includes assumptions that omit complexity found in the original study data.
+
+
+
+#### The Selection Bias Problem 
+
+Governments don't randomly assign protection. They typically protect forests that are already less likely to be cleared—remote areas, steep terrain, or poor soil quality. Simply comparing deforestation rates inside versus outside protected areas would be misleading.
+
+
+#### The RDD Solution 
+
+By comparing forests immediately on either side of protected area boundaries (within ~1.5km), the study isolates the causal effect of legal protection. Two forests 50 meters apart on opposite sides of a boundary make for a good comparison except for protection status.
+
+
+#### The Findings
+
+Protected areas are only about **30% effective** on average at preventing deforestation. While some nations like New Zealand (89% effective), Finland (77%), and Canada (63%) show high effectiveness, many countries with critical biodiversity have relatively low protection efficacy: Indonesia (11%), the Democratic Republic of Congo (4%), Bolivia (4%), and Venezuela (0%).
+
+
+
+## Study Replication
+
+Using `Simulated_Deforestation_Data6.csv`, we will replicate Neal’s approach. 
+
+### 0. Load packages + study data 
+
+```{r}
+library(tidyverse)
+library(rdrobust)
+library(here)
+library(jtools)
+library(janitor)
+library(patchwork)
+library(gt)
+```
+
+Read in the simulated data
+```{r}
+#| eval: false
+#| echo: true
+
+
+sim_data <- read_csv(here("week5", "data", "Simulated_Deforestation_Data6.csv"), show_col_types = FALSE)
+```
+
+
+
+### 1. Create variable description table for key variables in the analysis 
+
+```{r}
+#| echo: false
+
+variable_descriptions <- tribble(
+  ~ "Label" , ~"Description",
+  #---------|--------------|,
+  "protected (Treatment)", "Site is inside a Protected Area (1 = inside, 0 = outside)",
+  "deforest (Outcome)", "Annual rate of forest loss (0 to 1) detected via satellite imagery.",
+  "distance (Running Variable)", "The shortest distance (in km) from the forest pixel to the nearest protected area boundary. Negative = Outside, Positive = Inside.",
+  "slope", "Steepness of the terrain.",
+  "road_proximity", "Distance to the nearest road (km).",
+  "water_proximity ", "Distance to the nearest water source (km).",
+  "soil_nutrition", "Categorical scale (0-2) of soil quality for agriculture.",
+  "country", "The nation where the forest plot is located. ",
+  "slope_cat", "Binary indicator for high slope vs. low slope for stratified analysis.",
+  "road_cat ", "Binary indicator for proximity to roads (Near vs. Far).",
+  "soil_cat", "Binary indicator for high fertility vs. low fertility soil."
+)
+
+gt(variable_descriptions) %>%
+  tab_header(
+    title = "Variable Descriptions (Treatment, Outcome, and RDD Covariates)",
+    subtitle = "Replication of Neal (2024) Forest Protection Study"
+  ) %>%
+  cols_label(
+    Label = "Variable Name",
+    Description = "Definition"
+  ) %>%
+  tab_options(
+    heading.title.font.size = px(20),
+    column_labels.font.weight = "bold"
+  )
+```
+
+
+
+
+### 2. Visualize the discontinuity using binned means (`bin size = 1`)
+
+
+```{r}
+data_binned <- sim_data |> 
+  mutate(distance_bin = cut(distance, breaks = seq(-20, 20, by = 1), include.lowest = TRUE)) |> 
+  group_by(distance_bin, protected) |> 
+  summarise(
+    avg_distance = mean(distance),
+    avg_deforest = mean(deforest),
+    .groups = 'drop'
+  )
+```
+
+
+### 3. Plot using binned data 
+```{r}
+rdd_lm <- ggplot(data_binned, aes(x = avg_distance, y = avg_deforest, color = factor(protected))) +
+  geom_point(alpha = 0.5) +
+  geom_smooth(method = "lm", aes(group= protected)) +
+  geom_vline(xintercept = 0, linetype = 'dashed', color = 'skyblue', linewidth = 4) +
+  theme_minimal()
+rdd_lm
+```
+
+
+
+Interpret the plot above. What are the two lines representing and what do their trends reveal? Explain what the positive and negative values mean here (refer to the variable description for distance if you are unsure!). 
+
+What would it mean if there were NO discontinuity at distance = 0? How would that change your interpretation of protected area effectiveness?
+
+
+**RESPONSE**: Each line represents deforestation trends at distances from protected areas (PA), positive distances being within PAs. If no discontinuity, this would say that protected areas have no effect on deforestation.
+
+
+### 4. Run RDD Analysis using OLS 
+```{r}
+rdd_ols <- lm(deforest ~ protected + distance + protected*distance + slope_cat + road_cat + water_cat + soil_cat, data = sim_data)
+
+summ(rdd_ols, digits = 3, model.info = FALSE, model.fit = FALSE)
+```
+
+
+
+Based on the regression results, what is the estimated causal effect of protected area status on deforestation? Does this match what you see in the plot? What does the interaction coefficient represent?
+
+**RESPONSE**: The estimated effect is about 10% less deforestation in PAs. The interaction coefficient represents the relative slope in PAs, being 0.002 units higher.
+
+### 4. Estimate & Visualize RDD using `{rdrobust}` 
+
+
+##### RDD Robust Estimation Method (local polynomial regression):
+
+Local polynomial regression is a method used to give more weight to observations near a specific point— in this case, the RDD threshold. Instead of using OLS, it fits separate non-linear regressions on either side of the cutoff using a subset of the data near the cutoff (i.e., bandwidth).
+
+
+
+##### Interpreting output:
+
+Default estimation options used by the `rdrobust()` function:
+
+**Bandwidth Optimization** (BW type: mserd): Bandwidth is optimized to balance accuracy & bias.
+
+**Bandwidth Estimate** (BW est. (h) = 2.207): The estimated range around the cutoff used to subset the data to estimate the treatment effect.
+
+**Kernel** (Triangular): Gives higher weight to data points close to the cutoff.
+
+**Variance Estimation** (VCE method: NN): Instead of assuming equal variance across all observations, the error estimates are adjusted to account for variability near the cutoff.
+
+#### Take a random sample (To adjust for memory-limit & speed)
+
+```{r}
+global_samp <- sim_data %>%
+     sample_n(size = nrow(sim_data) * 1.0) # <<< e.g., .5 for 50%
+```
+
+### 5. Estimate Global RDD
+```{r}
+global_rdd <- rdrobust(
+  y = global_samp$deforest,
+  x = global_samp$distance,
+  covs = global_samp |> select(slope_cat, road_cat, water_cat, soil_cat),
+  c = 0, 
+  kernel = 'triangular'
+)
+
+summary(global_rdd)
+```
+
+
+
+The RD Effect here is -0.073, while in the previous regression table the `protected` coefficient was  -0.100. Why are they similar but not exactly the same? Which one should we trust more?
+
+What advantages does this 'local polynomial regression' approach have over the simple linear regression we saw before?
+
+**RESPONSE**: The points nearest to the border are weighted more, capturing more nuance in the model.
+
+
+### 6. Visualize the RDD discontinuity using `rdplot()`:
+
+This plot presents the local polynomial regression curves fit on either side of the cutoff.
+
+```{r}
+rdd_poly <- rdplot(y = sim_data$deforest, x = sim_data$distance, c = 0, binselect = 'es', title = "RD: Deforestation Rate", x.label = "Distance to PA Border (m)", y.label = "Deforestation Rate")
+```
+
+Let's look at our results side by side. 
+
+```{r}
+rdd_lm + rdd_poly$rdplot
+```
+
+
+Compare the two plots. What key differences do you notice between the left plot (binned linear) and the right plot (local polynomial)? Which one better captures the pattern in the data?
+
+**RESPONSE**: The second captures the patten better as it's not restricted to linear line.
+333
+
+### 7. Estimate separate RDD models by country using a loop function 🔄
+
+:::{.callout-tip title = "What is an iterator or loop function?"}
+`lapply()` loops across the input levels for `country` and applies the function `run_country_rdd`
+:::
+
+
+```{r}
+run_country_rdd <- function(country_name){
+
+  df_country <- sim_data |> filter(country == country_name)
+
+  rdd_model <- rdrobust(
+    y = df_country$deforest,
+    x = df_country$distance,
+    covs = df_country |> select(slope_cat, road_cat, water_cat, soil_cat),
+    c = 0,
+    p = 1,
+    kernel = "triangular"
+  )
+}
+
+# Apply function to countries
+rdd_6country <- lapply(unique(sim_data$country), run_country_rdd)
+```
+
+### 8. Generate county level discontinuity plots
+
+```{r}
+# Create list to store plots
+plot_list <- list()
+
+# Loop across 6 countries and plot
+for (country_name in unique(sim_data$country)) {
+  df_country <- sim_data %>% filter(country == country_name)
+  
+ p <- rdplot(
+      y = df_country$deforest,
+      x = df_country$distance,
+      c = 0,
+      binselect = "es",
+      title = paste(country_name),
+      x.label="", y.label = "")
+  
+ p <- p$rdplot +
+     labs(x=" ",y="")
+ 
+  plot_list[[country_name]] <- p  # Store each plot in the list
+  }
+```
+
+
+
+### 9. Print combined RDD Plots by country
+```{r}
+final_plot <- wrap_plots(plot_list) +
+  plot_layout(ncol = 2) +
+  plot_annotation(
+    title = 'Deforestation Rate',
+    caption = "Simulated Data"
+  )
+
+final_plot
+```
+
+
+
+How do the results of these countries compare with the results from Neal 2024?
+
+
+**RESPONSE**: Pretty similarly.
