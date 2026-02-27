@@ -1,0 +1,463 @@
+---
+title: "Lab Week 8: Mixed Effects Models (MLM)"
+subtitle: "Nitrate in streams case study (simulated): Smushed vs Within vs Between Effects"
+author: "EDS 241 / ESM 244"
+format:
+  html:
+    theme: sketchy
+    css: styles.css
+    number-sections: true
+date: "February 26, 2026"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
+```
+
+------------------------------------------------------------------------
+
+### Lab Outline
+
+0. Load packages + data  
+1. Visualize clustering (why MLM?)  
+2. Model 1: Empty random intercept model (ICC)  
+3. Model 2: The **smushed** effect  
+4. Model 3: The **within** effect (CWC)  
+5. Model 4: The **between** effect (site mean)  
+6. Model 5: Within + Between together (clean separation)  
+7. Model 6: Contextual effect (Between − Within)  
+8. Model 7: Random slopes (site-specific within effects)  
+9. Model 8: Cross-level interaction (agriculture moderates within effect)  
+10. Wrap-up: What to look for in papers  
+
+------------------------------------------------------------------------
+
+### Applied motivation (why this lab exists)
+
+In environmental monitoring, we often collect **repeated measurements** at the same locations:
+
+- Monthly nitrate at each stream site  
+- Daily PM2.5 at each monitoring station  
+- Annual vegetation surveys on the same plots  
+
+When we have repeated measures or nested sampling, observations within a cluster (site, station, plot) are typically **more similar** than observations across clusters.
+
+**Multilevel models (MLM)** also called *mixed effects models*, *hierarchical models*, or *random effects models* explicitly model that clustering.
+
+This lab’s goal is to break down Craig Enders’ “**4 effects**” concept:
+
+> A Level-1 predictor like rainfall can contain **two different kinds of information**:
+>
+> - **Within-site variation** (deviations from a site’s mean)
+> - **Between-site variation** (differences in site means)
+>
+> If you don’t separate them, you get a blended slope coefficient: the **smushed** effect.
+
+------------------------------------------------------------------------
+
+### Load packages + data
+
+```{r}
+library(tidyverse)    # wrangling + plotting
+library(lubridate)    # dates
+library(jtools)       # tidy regression output
+library(here)         # portable file paths (project-root relative)
+library(gt)           # nice tables
+library(lme4)         # lmer()
+library(lmerTest)     # p-values / df for lmer
+library(performance)  # ICC + diagnostics helpers
+library(ggeffects)    # model predictions for plots
+library(patchwork)    # combine plots
+```
+
+### Read in the simulated nitrate data
+
+```{r}
+
+nitrate_df <- read_csv(here('week8', 'data', 'nitrate_mlm_sim.csv'))
+
+```
+
+### Variable descriptions
+
+```{r, echo=FALSE}
+variable_descriptions <- tribble(
+  ~ "Label", ~ "Description",
+  "site_id (Level-2)", "Stream monitoring site (cluster).",
+  "date (Level-1)", "Monthly measurement date.",
+  "log_nitrate (Outcome)", "log(nitrate mg/L). Using log makes effects interpretable as percent changes.",
+  "rain_7day_mm", "7-day cumulative rainfall (mm).",
+  "rain_cgm", "Grand-mean centered rainfall (mix of within + between).",
+  "rain_cwc", "Site-mean centered rainfall anomaly (within-site).",
+  "rain_mean_site_cgm", "Site mean rainfall (grand-mean centered).",
+  "landuse_ag_cgm (Level-2)", "Agriculture intensity (grand-mean centered).",
+  "temp_cwc (Level-1)", "Temperature anomaly within site (site-mean centered)."
+)
+
+variable_descriptions %>% 
+gt() %>%
+  tab_header(title = "Nitrate dataset: Key variables") %>%
+  tab_style(style = cell_text(weight = "bold"), locations = cells_column_labels())
+```
+
+------------------------------------------------------------------------
+
+### 1. Visualize clustering: nitrate over time by site
+
+```{r}
+ggplot(nitrate_df, aes(date, log_nitrate, group = site_id)) +
+  geom_line(alpha = 0.15) +
+  stat_summary(aes(group = 1), fun = mean, geom = "line", linewidth = 1) +
+  labs(
+    title = "Monthly nitrate by site (log scale)",
+    subtitle = "Thin lines = sites; thick line = grand mean over time",
+    x = NULL, y = "log(nitrate)"
+  )
+```
+
+
+**Q1.** Based on this plot, why is it misleading to treat all rows as independent in a single-level regression?
+
+**Response:** There are repeated measurements at the same site, within-site measurements are not independent.
+
+------------------------------------------------------------------------
+
+### Calculating Intra-Class Correlation (ICC)
+
+> What portion of the variation in nitrate levels is between-site vs within-site?
+
+![ICC Equation](figures/ICC.png)
+
+------------------------------------------------------------------------
+
+### MODEL 0: single-level empty (ignores clustering)
+```{r}
+
+m0_lm <- lm(log_nitrate ~ 1, nitrate_df)
+
+summ(m0_lm, digits = 3, model.fit = FALSE)
+```
+
+### Model 1: Empty random intercept model
+
+**Goal:** Partition variance into:
+
+- **between-site variance** (sites have different baselines)  
+- **within-site variance** (month-to-month fluctuation within a site)
+
+```{r}
+
+m1_empty <- lmer(log_nitrate ~ 1 + (1 | site_id), data = nitrate_df, REML = TRUE)
+
+summ(m1_empty, digits = 3, model.fit = FALSE)
+```
+
+### Calculate ICC (portion of between-level variance):
+
+```{r}
+performance::icc(m1_empty)
+```
+
+------------------------------------------------------------------------
+
+### How to grand mean center (CGM) and group mean center (CWC) your predictors
+
+> Centering helps us isolate within- from between-level variance for predictor *fixed effects*
+
+------------------------------------------------------------------------
+
+Creating variance component predictors: 
+
+- Grand mean centered rain (`rain_cgm`), 
+- Centered within-site rain anomaly (`rain_cwc`) 
+- Between-site difference from grand mean (`rain_mean_site_cgm`)
+
+```{r}
+# grand mean of rain across *all* observations
+grand_mean_rain <- mean(nitrate_df$rain_7day_mm)
+
+centered_vars <- nitrate_df %>%
+  group_by(site_id) %>%
+  mutate(
+    # site mean rain
+    rain_mean_site = mean(rain_7day_mm, na.rm = TRUE),
+
+    # 1) Grand-mean centered rain (CGM): mixes within + between variation
+    rain_cgm = rain_7day_mm - grand_mean_rain,
+
+    # 2) Centered-within-site (CWC): “rain anomaly” vs that site’s typical rain
+    rain_cwc = rain_7day_mm - rain_mean_site,
+
+    # 3) Site mean rain, grand-mean centered: between-site component
+    rain_mean_site_cgm = rain_mean_site - grand_mean_rain
+  ) %>%
+  ungroup()
+```
+
+
+------------------------------------------------------------------------
+
+### Plot: distribution of random intercepts (site baselines)
+
+```{r}
+re_int <- ranef(m1_empty)$site_id |>
+  as_tibble(rownames = "site_id") |>
+  rename(u0_hat = `(Intercept)`)
+
+ggplot(re_int, aes(u0_hat)) +
+  geom_histogram(bins = 25, fill = "blue", color="lightblue") +
+  labs(
+    title = "Random intercepts: site baseline deviations",
+    x = "Estimated site deviation from the grand mean",
+    y = "Number of sites") + theme_minimal()
+```
+
+**Q2.** What does a *larger* ICC mean here? How does it change (a) effective sample size and (b) how important it is to model site differences?
+
+**Response:** A larger ICC means that more variation comes from between site differences. Since there's more variation &overlap, a smaller effective sample size results.
+
+------------------------------------------------------------------------
+
+### Model 2: Smushed effect (grand-mean centered rainfall)
+
+This model uses `rain_cgm`, which mixes within + between information into one slope.
+
+```{r}
+m2_smushed <- lmer(log_nitrate ~ rain_cgm + (1|site_id), data = nitrate_df, REML = TRUE)
+
+summ(m2_smushed, digits = 3, model.fit = FALSE)
+```
+
+### Visualize the “Smushed Effect”
+
+```{r}
+# Between-site means
+site_means <- nitrate_df |>
+  group_by(site_id) |>
+  summarise(
+    mean_log_nitrate = mean(log_nitrate),
+    mean_rain = mean(rain_7day_mm),
+    .groups = "drop"
+  )
+
+# Within-site demeaned outcome 
+within_df <- nitrate_df |>
+  group_by(site_id) |>
+  mutate(
+    log_nitrate_cwc = log_nitrate - mean(log_nitrate)
+  ) |>
+  ungroup()
+
+p_smushed <- ggplot(nitrate_df, aes(rain_7day_mm, log_nitrate)) +
+  geom_point(alpha = 0.15) +
+  geom_smooth(method = "lm", se = FALSE) +
+  labs(title = "SMUSHED (all observations)", x = "7-day rain (mm)", y = "log(nitrate)")
+
+p_within <- ggplot(within_df, aes(rain_cwc, log_nitrate_cwc)) +
+  geom_point(alpha = 0.15) +
+  geom_smooth(method = "lm", se = FALSE) +
+  labs(title = "WITHIN (demeaned by site)", x = "Rain anomaly within site (CWC)", y = "Nitrate anomaly within site")
+
+p_between <- ggplot(site_means, aes(mean_rain, mean_log_nitrate)) +
+  geom_point(alpha = 0.85) +
+  geom_smooth(method = "lm", se = FALSE) +
+  labs(title = "BETWEEN (site means)", x = "Mean rain by site", y = "Mean log(nitrate) by site")
+
+(p_smushed | p_within | p_between) +
+  plot_annotation(
+    title = "Why the smushed effect can be misleading",
+    subtitle = "If within and between effects differ in direction, the combined slope can cancel out.")
+```
+
+**Q3.** In one or two sentences: what does it mean that the smushed effect is a “blend”? Use the three-panel figure to support your explanation.
+
+**Response:** Looking at the within and between plots, one slope is slightly positive while the other is very negative. The smushed effect is a combination between these two as it's resulting in a slightly negative slope.
+
+------------------------------------------------------------------------
+
+## Model 3: Within-site effect (CWC)
+
+This targets the within-site question:
+
+> “When rainfall is higher than usual for the same site, does nitrate change?”
+
+```{r}
+m3_within <- lmer(log_nitrate ~ rain_cwc + (1|site_id), data = nitrate_df)
+
+summ(m3_within, digits = 3, model.fit = FALSE)
+```
+
+### Plot: within-site relationship (anomalies)
+
+```{r}
+ggplot(within_df, aes(rain_cwc, log_nitrate_cwc)) +
+  geom_point(alpha = 0.15) +
+  geom_smooth(method = "lm", se = TRUE) +
+  labs(
+    title = "Within-site effect: rain anomalies vs nitrate anomalies",
+    subtitle = "This isolates variation within the same site over time",
+    x = "Rain anomaly within site (mm)",
+    y = "Nitrate anomaly within site (demeaned log scale)"
+  )
+```
+
+
+**Q4.** Interpret the within-site coefficient in plain English (direction + unit). 
+
+**Response:** An increase of 1mm in rain anomaly is associated with log(0.003) units change in log nitrate.
+
+------------------------------------------------------------------------
+
+### 6. Model 4: Between-site effect (site mean rainfall)
+
+This targets the between-site question:
+
+> “Do wetter sites (on average) have different average nitrate?”
+
+```{r}
+m4_between <- lmer(log_nitrate ~ rain_mean_site_cgm + (1 | site_id),
+  data = nitrate_df,
+  REML = TRUE)
+
+summ(m4_between, digits = 3, model.fit = FALSE)
+```
+
+### Plot: between-site means
+
+```{r}
+ggplot(site_means, aes(mean_rain, mean_log_nitrate)) +
+  geom_point(alpha = 0.85) +
+  geom_smooth(method = "lm", se = TRUE) +
+  labs(
+    title = "Between-site effect: site mean rain vs site mean nitrate",
+    x = "Mean rain by site (mm)",
+    y = "Mean log(nitrate) by site"
+  )
+```
+
+
+**Q5.** Why might the between-site relationship differ from the within-site relationship? Give one plausible environmental mechanism or confounder.
+
+**Response:** Between-site differences may include land uses differences. For example, lakes near farms would have high nitrate and be more influenced by rain.
+
+------------------------------------------------------------------------
+
+### Model 5: Within + Between together (clean separation)
+
+This specification provides separate within- and between-level rain effects.
+
+```{r}
+m5_within_between <- lmer(log_nitrate ~ rain_cwc + rain_mean_site_cgm + (1 | site_id),
+  data = nitrate_df,
+  REML = TRUE)
+
+summ(m5_within_between, digits = 3, model.fit = FALSE)
+```
+
+### Plot: marginal relationships for both effects
+
+```{r}
+p1 <- plot(ggpredict(m5_within_between, terms = "rain_cwc [all]")) +
+  labs(title = "Within effect (CWC)", x = "Rain anomaly (mm)", y = "Predicted log(nitrate)")
+
+p2 <- plot(ggpredict(m5_within_between, terms = "rain_mean_site_cgm [all]")) +
+  labs(title = "Between effect (site mean)", x = "Site mean rain (CGM)", y = "Predicted log(nitrate)")
+
+p1 | p2
+```
+
+**Q6.** Write a sentence that communicates both the within and between findings.
+
+**Response:** When rainfall has a high anomaly within sites, nitrate is higher but this is a weak effect and barely significant. Between sites, sites that have higher rainfall have lower nitrate and this is a stronger effect and statistically significant.
+
+------------------------------------------------------------------------
+
+### 9. Model 7: Random slopes (site-specific within effects)
+
+Now we allow the within-site rain effect to vary by site:
+
+```{r}
+m7_rand_slope <- lmer(log_nitrate ~ rain_cwc + rain_mean_site_cgm + temp_cwc + landuse_ag_cgm + (1 + rain_cwc | site_id),
+  data = nitrate_df,
+  REML = TRUE)
+
+summ(m7_rand_slope , digits = 3, model.fit = FALSE)
+```
+
+### Plot: Site-specific fitted slopes 
+
+```{r}
+some_sites <- nitrate_df |> distinct(site_id) |> slice_head(n = 12) |> pull(site_id)
+
+grid_df <- nitrate_df |>
+  filter(site_id %in% some_sites) |>
+  group_by(site_id) |>
+  reframe(
+    rain_cwc = seq(min(rain_cwc), max(rain_cwc), length.out = 30),
+    rain_mean_site_cgm = first(rain_mean_site_cgm),
+    temp_cwc = 0,
+    landuse_ag_cgm = first(landuse_ag_cgm),
+    .groups = "drop"
+  )
+
+grid_df$pred <- predict(m7_rand_slope, newdata = grid_df, re.form = NULL)
+
+ggplot(grid_df, aes(rain_cwc, pred, group = site_id)) +
+  geom_line(alpha = 0.85) +
+  labs(
+    title = "Random slopes: rainfall effect varies by site",
+    subtitle = "Each line is the predicted within-site relationship for one site (temp_cwc fixed at 0)",
+    x = "Rain anomaly within site (mm)",
+    y = "Predicted log(nitrate)"
+  )
+```
+
+
+**Q8.** What does it mean if the random slope variance for `rain_cwc` is near 0? What does it mean if it is clearly > 0?
+
+**Response:** Near zero means that within-site rain differences aren't that different. Greater than zero suggests that nitrate level responds to rainfall differently in different sites. 
+
+------------------------------------------------------------------------
+
+### Model 8: Cross-level interaction (agriculture moderates within effect)
+
+We now test whether slope heterogeneity is systematically related to agriculture:
+
+```{r}
+m8_cross_level <- lmer(log_nitrate ~ rain_cwc * landuse_ag_cgm + rain_mean_site_cgm + temp_cwc + (1 + rain_cwc | site_id),
+  data = nitrate_df,
+  REML = TRUE)
+
+summ(m8_cross_level, digits = 3, model.fit = FALSE)
+```
+
+### Plot: predicted within-site relationship at low/avg/high agriculture
+
+```{r}
+plot(ggpredict(
+  m8_cross_level,
+  terms = c("rain_cwc [all]", "landuse_ag_cgm [-0.25, 0, 0.25]")
+)) +
+  labs(
+    title = "Cross-level interaction: agriculture moderates rain → nitrate",
+    subtitle = "Lines show predicted within-site effect at different agriculture levels",
+    x = "Rain anomaly within site (mm)",
+    y = "Predicted log(nitrate)"
+  )
+```
+
+------------------------------------------------------------------------
+
+### 11. Wrap-up: what to look for in environmental science papers
+
+When you read a “mixed effects” Methods section, look for:
+
+1. **Levels** (What is nested in what?)  
+2. **Random effects structure** (random intercepts only? random slopes?)  
+3. Whether they separated **within vs between** (or reported a potentially smushed slope)  
+4. Whether fixed effects are interpreted on the correct scale (log vs raw)  
+
+**Take-home:** In clustered data, “the effect of X” is often *not one number* unless you are explicit about whether you mean within-site variation, between-site differences, or both.
+
+------------------------------------------------------------------------
+

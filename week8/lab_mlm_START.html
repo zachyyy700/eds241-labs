@@ -1,0 +1,2593 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.8.25">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+<meta name="author" content="EDS 241 / ESM 244">
+<meta name="dcterms.date" content="2026-02-26">
+
+<title>Lab Week 8: Mixed Effects Models (MLM)</title>
+<style>
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+/* CSS for syntax highlighting */
+html { -webkit-text-size-adjust: 100%; }
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+  }
+pre.numberSource { margin-left: 3em;  padding-left: 4px; }
+div.sourceCode
+  {   }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+</style>
+
+
+<script src="lab_mlm_START_files/libs/clipboard/clipboard.min.js"></script>
+<script src="lab_mlm_START_files/libs/quarto-html/quarto.js" type="module"></script>
+<script src="lab_mlm_START_files/libs/quarto-html/tabsets/tabsets.js" type="module"></script>
+<script src="lab_mlm_START_files/libs/quarto-html/axe/axe-check.js" type="module"></script>
+<script src="lab_mlm_START_files/libs/quarto-html/popper.min.js"></script>
+<script src="lab_mlm_START_files/libs/quarto-html/tippy.umd.min.js"></script>
+<script src="lab_mlm_START_files/libs/quarto-html/anchor.min.js"></script>
+<link href="lab_mlm_START_files/libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="lab_mlm_START_files/libs/quarto-html/quarto-syntax-highlighting-7b89279ff1a6dce999919e0e67d4d9ec.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<script src="lab_mlm_START_files/libs/bootstrap/bootstrap.min.js"></script>
+<link href="lab_mlm_START_files/libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="lab_mlm_START_files/libs/bootstrap/bootstrap-aff6bd71cf38ce7a6494770b00151a6f.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+
+
+<link rel="stylesheet" href="styles.css">
+</head>
+
+<body class="fullcontent quarto-light">
+
+<div id="quarto-content" class="page-columns page-rows-contents page-layout-article">
+
+<main class="content" id="quarto-document-content">
+
+<header id="title-block-header" class="quarto-title-block default">
+<div class="quarto-title">
+<h1 class="title">Lab Week 8: Mixed Effects Models (MLM)</h1>
+<p class="subtitle lead">Nitrate in streams case study (simulated): Smushed vs Within vs Between Effects</p>
+</div>
+
+
+
+<div class="quarto-title-meta">
+
+    <div>
+    <div class="quarto-title-meta-heading">Author</div>
+    <div class="quarto-title-meta-contents">
+             <p>EDS 241 / ESM 244 </p>
+          </div>
+  </div>
+    
+    <div>
+    <div class="quarto-title-meta-heading">Published</div>
+    <div class="quarto-title-meta-contents">
+      <p class="date">February 26, 2026</p>
+    </div>
+  </div>
+  
+    
+  </div>
+  
+
+
+</header>
+
+
+<hr>
+<section id="lab-outline" class="level3" data-number="0.1">
+<h3 data-number="0.1" class="anchored" data-anchor-id="lab-outline"><span class="header-section-number">0.1</span> Lab Outline</h3>
+<ol start="0" type="1">
+<li>Load packages + data<br>
+</li>
+<li>Visualize clustering (why MLM?)<br>
+</li>
+<li>Model 1: Empty random intercept model (ICC)<br>
+</li>
+<li>Model 2: The <strong>smushed</strong> effect<br>
+</li>
+<li>Model 3: The <strong>within</strong> effect (CWC)<br>
+</li>
+<li>Model 4: The <strong>between</strong> effect (site mean)<br>
+</li>
+<li>Model 5: Within + Between together (clean separation)<br>
+</li>
+<li>Model 6: Contextual effect (Between − Within)<br>
+</li>
+<li>Model 7: Random slopes (site-specific within effects)<br>
+</li>
+<li>Model 8: Cross-level interaction (agriculture moderates within effect)<br>
+</li>
+<li>Wrap-up: What to look for in papers</li>
+</ol>
+<hr>
+</section>
+<section id="applied-motivation-why-this-lab-exists" class="level3" data-number="0.2">
+<h3 data-number="0.2" class="anchored" data-anchor-id="applied-motivation-why-this-lab-exists"><span class="header-section-number">0.2</span> Applied motivation (why this lab exists)</h3>
+<p>In environmental monitoring, we often collect <strong>repeated measurements</strong> at the same locations:</p>
+<ul>
+<li>Monthly nitrate at each stream site<br>
+</li>
+<li>Daily PM2.5 at each monitoring station<br>
+</li>
+<li>Annual vegetation surveys on the same plots</li>
+</ul>
+<p>When we have repeated measures or nested sampling, observations within a cluster (site, station, plot) are typically <strong>more similar</strong> than observations across clusters.</p>
+<p><strong>Multilevel models (MLM)</strong> also called <em>mixed effects models</em>, <em>hierarchical models</em>, or <em>random effects models</em> explicitly model that clustering.</p>
+<p>This lab’s goal is to break down Craig Enders’ “<strong>4 effects</strong>” concept:</p>
+<blockquote class="blockquote">
+<p>A Level-1 predictor like rainfall can contain <strong>two different kinds of information</strong>:</p>
+<ul>
+<li><strong>Within-site variation</strong> (deviations from a site’s mean)</li>
+<li><strong>Between-site variation</strong> (differences in site means)</li>
+</ul>
+<p>If you don’t separate them, you get a blended slope coefficient: the <strong>smushed</strong> effect.</p>
+</blockquote>
+<hr>
+</section>
+<section id="load-packages-data" class="level3" data-number="0.3">
+<h3 data-number="0.3" class="anchored" data-anchor-id="load-packages-data"><span class="header-section-number">0.3</span> Load packages + data</h3>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb1"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(tidyverse)    <span class="co"># wrangling + plotting</span></span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(lubridate)    <span class="co"># dates</span></span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(jtools)       <span class="co"># tidy regression output</span></span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(here)         <span class="co"># portable file paths (project-root relative)</span></span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(gt)           <span class="co"># nice tables</span></span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(lme4)         <span class="co"># lmer()</span></span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(lmerTest)     <span class="co"># p-values / df for lmer</span></span>
+<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(performance)  <span class="co"># ICC + diagnostics helpers</span></span>
+<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(ggeffects)    <span class="co"># model predictions for plots</span></span>
+<span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(patchwork)    <span class="co"># combine plots</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+</section>
+<section id="read-in-the-simulated-nitrate-data" class="level3" data-number="0.4">
+<h3 data-number="0.4" class="anchored" data-anchor-id="read-in-the-simulated-nitrate-data"><span class="header-section-number">0.4</span> Read in the simulated nitrate data</h3>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb2"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a>nitrate_df <span class="ot">&lt;-</span> <span class="fu">read_csv</span>(<span class="fu">here</span>(<span class="st">'week8'</span>, <span class="st">'data'</span>, <span class="st">'nitrate_mlm_sim.csv'</span>))</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+</section>
+<section id="variable-descriptions" class="level3" data-number="0.5">
+<h3 data-number="0.5" class="anchored" data-anchor-id="variable-descriptions"><span class="header-section-number">0.5</span> Variable descriptions</h3>
+<div class="cell">
+<div class="cell-output-display">
+<div id="dhrzfnlhbi" style="padding-left:0px;padding-right:0px;padding-top:10px;padding-bottom:10px;overflow-x:auto;overflow-y:auto;width:auto;height:auto;">
+<style>#dhrzfnlhbi table {
+  font-family: system-ui, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+#dhrzfnlhbi thead, #dhrzfnlhbi tbody, #dhrzfnlhbi tfoot, #dhrzfnlhbi tr, #dhrzfnlhbi td, #dhrzfnlhbi th {
+  border-style: none;
+}
+
+#dhrzfnlhbi p {
+  margin: 0;
+  padding: 0;
+}
+
+#dhrzfnlhbi .gt_table {
+  display: table;
+  border-collapse: collapse;
+  line-height: normal;
+  margin-left: auto;
+  margin-right: auto;
+  color: #333333;
+  font-size: 16px;
+  font-weight: normal;
+  font-style: normal;
+  background-color: #FFFFFF;
+  width: auto;
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: #A8A8A8;
+  border-right-style: none;
+  border-right-width: 2px;
+  border-right-color: #D3D3D3;
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #A8A8A8;
+  border-left-style: none;
+  border-left-width: 2px;
+  border-left-color: #D3D3D3;
+}
+
+#dhrzfnlhbi .gt_caption {
+  padding-top: 4px;
+  padding-bottom: 4px;
+}
+
+#dhrzfnlhbi .gt_title {
+  color: #333333;
+  font-size: 125%;
+  font-weight: initial;
+  padding-top: 4px;
+  padding-bottom: 4px;
+  padding-left: 5px;
+  padding-right: 5px;
+  border-bottom-color: #FFFFFF;
+  border-bottom-width: 0;
+}
+
+#dhrzfnlhbi .gt_subtitle {
+  color: #333333;
+  font-size: 85%;
+  font-weight: initial;
+  padding-top: 3px;
+  padding-bottom: 5px;
+  padding-left: 5px;
+  padding-right: 5px;
+  border-top-color: #FFFFFF;
+  border-top-width: 0;
+}
+
+#dhrzfnlhbi .gt_heading {
+  background-color: #FFFFFF;
+  text-align: center;
+  border-bottom-color: #FFFFFF;
+  border-left-style: none;
+  border-left-width: 1px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 1px;
+  border-right-color: #D3D3D3;
+}
+
+#dhrzfnlhbi .gt_bottom_border {
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+}
+
+#dhrzfnlhbi .gt_col_headings {
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: #D3D3D3;
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  border-left-style: none;
+  border-left-width: 1px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 1px;
+  border-right-color: #D3D3D3;
+}
+
+#dhrzfnlhbi .gt_col_heading {
+  color: #333333;
+  background-color: #FFFFFF;
+  font-size: 100%;
+  font-weight: normal;
+  text-transform: inherit;
+  border-left-style: none;
+  border-left-width: 1px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 1px;
+  border-right-color: #D3D3D3;
+  vertical-align: bottom;
+  padding-top: 5px;
+  padding-bottom: 6px;
+  padding-left: 5px;
+  padding-right: 5px;
+  overflow-x: hidden;
+}
+
+#dhrzfnlhbi .gt_column_spanner_outer {
+  color: #333333;
+  background-color: #FFFFFF;
+  font-size: 100%;
+  font-weight: normal;
+  text-transform: inherit;
+  padding-top: 0;
+  padding-bottom: 0;
+  padding-left: 4px;
+  padding-right: 4px;
+}
+
+#dhrzfnlhbi .gt_column_spanner_outer:first-child {
+  padding-left: 0;
+}
+
+#dhrzfnlhbi .gt_column_spanner_outer:last-child {
+  padding-right: 0;
+}
+
+#dhrzfnlhbi .gt_column_spanner {
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  vertical-align: bottom;
+  padding-top: 5px;
+  padding-bottom: 5px;
+  overflow-x: hidden;
+  display: inline-block;
+  width: 100%;
+}
+
+#dhrzfnlhbi .gt_spanner_row {
+  border-bottom-style: hidden;
+}
+
+#dhrzfnlhbi .gt_group_heading {
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+  color: #333333;
+  background-color: #FFFFFF;
+  font-size: 100%;
+  font-weight: initial;
+  text-transform: inherit;
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: #D3D3D3;
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  border-left-style: none;
+  border-left-width: 1px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 1px;
+  border-right-color: #D3D3D3;
+  vertical-align: middle;
+  text-align: left;
+}
+
+#dhrzfnlhbi .gt_empty_group_heading {
+  padding: 0.5px;
+  color: #333333;
+  background-color: #FFFFFF;
+  font-size: 100%;
+  font-weight: initial;
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: #D3D3D3;
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  vertical-align: middle;
+}
+
+#dhrzfnlhbi .gt_from_md > :first-child {
+  margin-top: 0;
+}
+
+#dhrzfnlhbi .gt_from_md > :last-child {
+  margin-bottom: 0;
+}
+
+#dhrzfnlhbi .gt_row {
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+  margin: 10px;
+  border-top-style: solid;
+  border-top-width: 1px;
+  border-top-color: #D3D3D3;
+  border-left-style: none;
+  border-left-width: 1px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 1px;
+  border-right-color: #D3D3D3;
+  vertical-align: middle;
+  overflow-x: hidden;
+}
+
+#dhrzfnlhbi .gt_stub {
+  color: #333333;
+  background-color: #FFFFFF;
+  font-size: 100%;
+  font-weight: initial;
+  text-transform: inherit;
+  border-right-style: solid;
+  border-right-width: 2px;
+  border-right-color: #D3D3D3;
+  padding-left: 5px;
+  padding-right: 5px;
+}
+
+#dhrzfnlhbi .gt_stub_row_group {
+  color: #333333;
+  background-color: #FFFFFF;
+  font-size: 100%;
+  font-weight: initial;
+  text-transform: inherit;
+  border-right-style: solid;
+  border-right-width: 2px;
+  border-right-color: #D3D3D3;
+  padding-left: 5px;
+  padding-right: 5px;
+  vertical-align: top;
+}
+
+#dhrzfnlhbi .gt_row_group_first td {
+  border-top-width: 2px;
+}
+
+#dhrzfnlhbi .gt_row_group_first th {
+  border-top-width: 2px;
+}
+
+#dhrzfnlhbi .gt_summary_row {
+  color: #333333;
+  background-color: #FFFFFF;
+  text-transform: inherit;
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+}
+
+#dhrzfnlhbi .gt_first_summary_row {
+  border-top-style: solid;
+  border-top-color: #D3D3D3;
+}
+
+#dhrzfnlhbi .gt_first_summary_row.thick {
+  border-top-width: 2px;
+}
+
+#dhrzfnlhbi .gt_last_summary_row {
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+}
+
+#dhrzfnlhbi .gt_grand_summary_row {
+  color: #333333;
+  background-color: #FFFFFF;
+  text-transform: inherit;
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+}
+
+#dhrzfnlhbi .gt_first_grand_summary_row {
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+  border-top-style: double;
+  border-top-width: 6px;
+  border-top-color: #D3D3D3;
+}
+
+#dhrzfnlhbi .gt_last_grand_summary_row_top {
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+  border-bottom-style: double;
+  border-bottom-width: 6px;
+  border-bottom-color: #D3D3D3;
+}
+
+#dhrzfnlhbi .gt_striped {
+  background-color: rgba(128, 128, 128, 0.05);
+}
+
+#dhrzfnlhbi .gt_table_body {
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: #D3D3D3;
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+}
+
+#dhrzfnlhbi .gt_footnotes {
+  color: #333333;
+  background-color: #FFFFFF;
+  border-bottom-style: none;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  border-left-style: none;
+  border-left-width: 2px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 2px;
+  border-right-color: #D3D3D3;
+}
+
+#dhrzfnlhbi .gt_footnote {
+  margin: 0px;
+  font-size: 90%;
+  padding-top: 4px;
+  padding-bottom: 4px;
+  padding-left: 5px;
+  padding-right: 5px;
+}
+
+#dhrzfnlhbi .gt_sourcenotes {
+  color: #333333;
+  background-color: #FFFFFF;
+  border-bottom-style: none;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  border-left-style: none;
+  border-left-width: 2px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 2px;
+  border-right-color: #D3D3D3;
+}
+
+#dhrzfnlhbi .gt_sourcenote {
+  font-size: 90%;
+  padding-top: 4px;
+  padding-bottom: 4px;
+  padding-left: 5px;
+  padding-right: 5px;
+}
+
+#dhrzfnlhbi .gt_left {
+  text-align: left;
+}
+
+#dhrzfnlhbi .gt_center {
+  text-align: center;
+}
+
+#dhrzfnlhbi .gt_right {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+#dhrzfnlhbi .gt_font_normal {
+  font-weight: normal;
+}
+
+#dhrzfnlhbi .gt_font_bold {
+  font-weight: bold;
+}
+
+#dhrzfnlhbi .gt_font_italic {
+  font-style: italic;
+}
+
+#dhrzfnlhbi .gt_super {
+  font-size: 65%;
+}
+
+#dhrzfnlhbi .gt_footnote_marks {
+  font-size: 75%;
+  vertical-align: 0.4em;
+  position: initial;
+}
+
+#dhrzfnlhbi .gt_asterisk {
+  font-size: 100%;
+  vertical-align: 0;
+}
+
+#dhrzfnlhbi .gt_indent_1 {
+  text-indent: 5px;
+}
+
+#dhrzfnlhbi .gt_indent_2 {
+  text-indent: 10px;
+}
+
+#dhrzfnlhbi .gt_indent_3 {
+  text-indent: 15px;
+}
+
+#dhrzfnlhbi .gt_indent_4 {
+  text-indent: 20px;
+}
+
+#dhrzfnlhbi .gt_indent_5 {
+  text-indent: 25px;
+}
+
+#dhrzfnlhbi .katex-display {
+  display: inline-flex !important;
+  margin-bottom: 0.75em !important;
+}
+
+#dhrzfnlhbi div.Reactable > div.rt-table > div.rt-thead > div.rt-tr.rt-tr-group-header > div.rt-th-group:after {
+  height: 0px !important;
+}
+</style>
+
+<table class="gt_table caption-top table table-sm table-striped small" data-quarto-bootstrap="false">
+<thead>
+<tr class="gt_heading header">
+<td colspan="2" class="gt_heading gt_title gt_font_normal gt_bottom_border">Nitrate dataset: Key variables</td>
+</tr>
+<tr class="gt_col_headings even">
+<th id="Label" class="gt_col_heading gt_columns_bottom_border gt_left" data-quarto-table-cell-role="th" style="font-weight: bold" scope="col">Label</th>
+<th id="Description" class="gt_col_heading gt_columns_bottom_border gt_left" data-quarto-table-cell-role="th" style="font-weight: bold" scope="col">Description</th>
+</tr>
+</thead>
+<tbody class="gt_table_body">
+<tr class="odd">
+<td class="gt_row gt_left" headers="Label">site_id (Level-2)</td>
+<td class="gt_row gt_left" headers="Description">Stream monitoring site (cluster).</td>
+</tr>
+<tr class="even">
+<td class="gt_row gt_left" headers="Label">date (Level-1)</td>
+<td class="gt_row gt_left" headers="Description">Monthly measurement date.</td>
+</tr>
+<tr class="odd">
+<td class="gt_row gt_left" headers="Label">log_nitrate (Outcome)</td>
+<td class="gt_row gt_left" headers="Description">log(nitrate mg/L). Using log makes effects interpretable as percent changes.</td>
+</tr>
+<tr class="even">
+<td class="gt_row gt_left" headers="Label">rain_7day_mm</td>
+<td class="gt_row gt_left" headers="Description">7-day cumulative rainfall (mm).</td>
+</tr>
+<tr class="odd">
+<td class="gt_row gt_left" headers="Label">rain_cgm</td>
+<td class="gt_row gt_left" headers="Description">Grand-mean centered rainfall (mix of within + between).</td>
+</tr>
+<tr class="even">
+<td class="gt_row gt_left" headers="Label">rain_cwc</td>
+<td class="gt_row gt_left" headers="Description">Site-mean centered rainfall anomaly (within-site).</td>
+</tr>
+<tr class="odd">
+<td class="gt_row gt_left" headers="Label">rain_mean_site_cgm</td>
+<td class="gt_row gt_left" headers="Description">Site mean rainfall (grand-mean centered).</td>
+</tr>
+<tr class="even">
+<td class="gt_row gt_left" headers="Label">landuse_ag_cgm (Level-2)</td>
+<td class="gt_row gt_left" headers="Description">Agriculture intensity (grand-mean centered).</td>
+</tr>
+<tr class="odd">
+<td class="gt_row gt_left" headers="Label">temp_cwc (Level-1)</td>
+<td class="gt_row gt_left" headers="Description">Temperature anomaly within site (site-mean centered).</td>
+</tr>
+</tbody>
+</table>
+
+</div>
+</div>
+</div>
+<hr>
+</section>
+<section id="visualize-clustering-nitrate-over-time-by-site" class="level3" data-number="0.6">
+<h3 data-number="0.6" class="anchored" data-anchor-id="visualize-clustering-nitrate-over-time-by-site"><span class="header-section-number">0.6</span> 1. Visualize clustering: nitrate over time by site</h3>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb3"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="fu">ggplot</span>(nitrate_df, <span class="fu">aes</span>(date, log_nitrate, <span class="at">group =</span> site_id)) <span class="sc">+</span></span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_line</span>(<span class="at">alpha =</span> <span class="fl">0.15</span>) <span class="sc">+</span></span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">stat_summary</span>(<span class="fu">aes</span>(<span class="at">group =</span> <span class="dv">1</span>), <span class="at">fun =</span> mean, <span class="at">geom =</span> <span class="st">"line"</span>, <span class="at">linewidth =</span> <span class="dv">1</span>) <span class="sc">+</span></span>
+<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">labs</span>(</span>
+<span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a>    <span class="at">title =</span> <span class="st">"Monthly nitrate by site (log scale)"</span>,</span>
+<span id="cb3-6"><a href="#cb3-6" aria-hidden="true" tabindex="-1"></a>    <span class="at">subtitle =</span> <span class="st">"Thin lines = sites; thick line = grand mean over time"</span>,</span>
+<span id="cb3-7"><a href="#cb3-7" aria-hidden="true" tabindex="-1"></a>    <span class="at">x =</span> <span class="cn">NULL</span>, <span class="at">y =</span> <span class="st">"log(nitrate)"</span></span>
+<span id="cb3-8"><a href="#cb3-8" aria-hidden="true" tabindex="-1"></a>  )</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="lab_mlm_START_files/figure-html/unnamed-chunk-4-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+</div>
+<p><strong>Q1.</strong> Based on this plot, why is it misleading to treat all rows as independent in a single-level regression?</p>
+<p><strong>Response:</strong> There are repeated measurements at the same site, within-site measurements are not independent.</p>
+<hr>
+</section>
+<section id="calculating-intra-class-correlation-icc" class="level3" data-number="0.7">
+<h3 data-number="0.7" class="anchored" data-anchor-id="calculating-intra-class-correlation-icc"><span class="header-section-number">0.7</span> Calculating Intra-Class Correlation (ICC)</h3>
+<blockquote class="blockquote">
+<p>What portion of the variation in nitrate levels is between-site vs within-site?</p>
+</blockquote>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="figures/ICC.png" class="img-fluid figure-img"></p>
+<figcaption>ICC Equation</figcaption>
+</figure>
+</div>
+<hr>
+</section>
+<section id="model-0-single-level-empty-ignores-clustering" class="level3" data-number="0.8">
+<h3 data-number="0.8" class="anchored" data-anchor-id="model-0-single-level-empty-ignores-clustering"><span class="header-section-number">0.8</span> MODEL 0: single-level empty (ignores clustering)</h3>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb4"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a>m0_lm <span class="ot">&lt;-</span> <span class="fu">lm</span>(log_nitrate <span class="sc">~</span> <span class="dv">1</span>, nitrate_df)</span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a><span class="fu">summ</span>(m0_lm, <span class="at">digits =</span> <span class="dv">3</span>, <span class="at">model.fit =</span> <span class="cn">FALSE</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output-display">
+<div class="table-responsive">
+<table class="table table-striped table-hover table-condensed caption-top table-sm small">
+<tbody>
+<tr class="odd">
+<td style="text-align: left; font-weight: bold;">Observations</td>
+<td style="text-align: right;">1080</td>
+</tr>
+<tr class="even">
+<td style="text-align: left; font-weight: bold;">Dependent variable</td>
+<td style="text-align: right;">log_nitrate</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left; font-weight: bold;">Type</td>
+<td style="text-align: right;">OLS linear regression</td>
+</tr>
+</tbody>
+</table>
+</div>
+  
+<div class="table-responsive">
+<table class="table table-striped table-hover table-condensed caption-top table-sm small">
+<thead>
+<tr class="header">
+<th style="text-align: left;" data-quarto-table-cell-role="th"></th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">Est.</th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">S.E.</th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">t val.</th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">p</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left; font-weight: bold;">(Intercept)</td>
+<td style="text-align: right;">0.212</td>
+<td style="text-align: right;">0.027</td>
+<td style="text-align: right;">7.924</td>
+<td style="text-align: right;">0.000</td>
+</tr>
+</tbody><tfoot>
+<tr class="odd">
+<td style="text-align: left; padding: 0;"><sup></sup> Standard errors: OLS</td>
+<td style="text-align: right;"></td>
+<td style="text-align: right;"></td>
+<td style="text-align: right;"></td>
+<td style="text-align: right;"></td>
+</tr>
+</tfoot>
+
+</table>
+</div>
+</div>
+</div>
+</section>
+<section id="model-1-empty-random-intercept-model" class="level3" data-number="0.9">
+<h3 data-number="0.9" class="anchored" data-anchor-id="model-1-empty-random-intercept-model"><span class="header-section-number">0.9</span> Model 1: Empty random intercept model</h3>
+<p><strong>Goal:</strong> Partition variance into:</p>
+<ul>
+<li><strong>between-site variance</strong> (sites have different baselines)<br>
+</li>
+<li><strong>within-site variance</strong> (month-to-month fluctuation within a site)</li>
+</ul>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb5"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a>m1_empty <span class="ot">&lt;-</span> <span class="fu">lmer</span>(log_nitrate <span class="sc">~</span> <span class="dv">1</span> <span class="sc">+</span> (<span class="dv">1</span> <span class="sc">|</span> site_id), <span class="at">data =</span> nitrate_df, <span class="at">REML =</span> <span class="cn">TRUE</span>)</span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a><span class="fu">summ</span>(m1_empty, <span class="at">digits =</span> <span class="dv">3</span>, <span class="at">model.fit =</span> <span class="cn">FALSE</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output-display">
+<div class="table-responsive">
+<table class="table table-striped table-hover table-condensed caption-top table-sm small">
+<tbody>
+<tr class="odd">
+<td style="text-align: left; font-weight: bold;">Observations</td>
+<td style="text-align: right;">1080</td>
+</tr>
+<tr class="even">
+<td style="text-align: left; font-weight: bold;">Dependent variable</td>
+<td style="text-align: right;">log_nitrate</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left; font-weight: bold;">Type</td>
+<td style="text-align: right;">Mixed effects linear regression</td>
+</tr>
+</tbody>
+</table>
+</div>
+  
+<div class="table-responsive">
+<table class="table table-striped table-hover table-condensed caption-top table-sm small">
+<colgroup>
+<col style="width: 16%">
+<col style="width: 16%">
+<col style="width: 16%">
+<col style="width: 16%">
+<col style="width: 16%">
+<col style="width: 16%">
+</colgroup>
+<thead>
+<tr class="header">
+<th colspan="6" data-quarto-table-cell-role="th" style="text-align: center; border-bottom: hidden; padding-bottom: 0; padding-left: 3px; padding-right: 3px;"><div style="border-bottom: 1px solid #ddd; padding-bottom: 5px; ">
+Fixed Effects
+</div></th>
+</tr>
+<tr class="even">
+<th style="text-align: left;" data-quarto-table-cell-role="th"></th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">Est.</th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">S.E.</th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">t val.</th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">d.f.</th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">p</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left; font-weight: bold;">(Intercept)</td>
+<td style="text-align: right;">0.212</td>
+<td style="text-align: right;">0.069</td>
+<td style="text-align: right;">3.057</td>
+<td style="text-align: right;">59.000</td>
+<td style="text-align: right;">0.003</td>
+</tr>
+</tbody><tfoot>
+<tr class="odd">
+<td style="text-align: left; padding: 0;"><sup></sup> p values calculated using Satterthwaite d.f.</td>
+<td style="text-align: right;"></td>
+<td style="text-align: right;"></td>
+<td style="text-align: right;"></td>
+<td style="text-align: right;"></td>
+<td style="text-align: right;"></td>
+</tr>
+</tfoot>
+
+</table>
+</div>
+ 
+<div class="table-responsive">
+<table class="table table-striped table-hover table-condensed caption-top table-sm small">
+<colgroup>
+<col style="width: 33%">
+<col style="width: 33%">
+<col style="width: 33%">
+</colgroup>
+<thead>
+<tr class="header">
+<th colspan="3" data-quarto-table-cell-role="th" style="text-align: center; border-bottom: hidden; padding-bottom: 0; padding-left: 3px; padding-right: 3px;"><div style="border-bottom: 1px solid #ddd; padding-bottom: 5px; ">
+Random Effects
+</div></th>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">Group</th>
+<th data-quarto-table-cell-role="th">Parameter</th>
+<th data-quarto-table-cell-role="th">Std. Dev.</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>site_id</td>
+<td>(Intercept)</td>
+<td>0.510</td>
+</tr>
+<tr class="even">
+<td>Residual</td>
+<td></td>
+<td>0.720</td>
+</tr>
+</tbody>
+</table>
+</div>
+ 
+<div class="table-responsive">
+<table class="table table-striped table-hover table-condensed caption-top table-sm small">
+<colgroup>
+<col style="width: 33%">
+<col style="width: 33%">
+<col style="width: 33%">
+</colgroup>
+<thead>
+<tr class="header">
+<th colspan="3" data-quarto-table-cell-role="th" style="text-align: center; border-bottom: hidden; padding-bottom: 0; padding-left: 3px; padding-right: 3px;"><div style="border-bottom: 1px solid #ddd; padding-bottom: 5px; ">
+Grouping Variables
+</div></th>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">Group</th>
+<th data-quarto-table-cell-role="th"># groups</th>
+<th data-quarto-table-cell-role="th">ICC</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>site_id</td>
+<td>60</td>
+<td>0.334</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</div>
+</section>
+<section id="calculate-icc-portion-of-between-level-variance" class="level3" data-number="0.10">
+<h3 data-number="0.10" class="anchored" data-anchor-id="calculate-icc-portion-of-between-level-variance"><span class="header-section-number">0.10</span> Calculate ICC (portion of between-level variance):</h3>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb6"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a>performance<span class="sc">::</span><span class="fu">icc</span>(m1_empty)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stdout">
+<pre><code># Intraclass Correlation Coefficient
+
+    Adjusted ICC: 0.334
+  Unadjusted ICC: 0.334</code></pre>
+</div>
+</div>
+<hr>
+</section>
+<section id="how-to-grand-mean-center-cgm-and-group-mean-center-cwc-your-predictors" class="level3" data-number="0.11">
+<h3 data-number="0.11" class="anchored" data-anchor-id="how-to-grand-mean-center-cgm-and-group-mean-center-cwc-your-predictors"><span class="header-section-number">0.11</span> How to grand mean center (CGM) and group mean center (CWC) your predictors</h3>
+<blockquote class="blockquote">
+<p>Centering helps us isolate within- from between-level variance for predictor <em>fixed effects</em></p>
+</blockquote>
+<hr>
+<p>Creating variance component predictors:</p>
+<ul>
+<li>Grand mean centered rain (<code>rain_cgm</code>),</li>
+<li>Centered within-site rain anomaly (<code>rain_cwc</code>)</li>
+<li>Between-site difference from grand mean (<code>rain_mean_site_cgm</code>)</li>
+</ul>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb8"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a><span class="co"># grand mean of rain across *all* observations</span></span>
+<span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a>grand_mean_rain <span class="ot">&lt;-</span> <span class="fu">mean</span>(nitrate_df<span class="sc">$</span>rain_7day_mm)</span>
+<span id="cb8-3"><a href="#cb8-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-4"><a href="#cb8-4" aria-hidden="true" tabindex="-1"></a>centered_vars <span class="ot">&lt;-</span> nitrate_df <span class="sc">%&gt;%</span></span>
+<span id="cb8-5"><a href="#cb8-5" aria-hidden="true" tabindex="-1"></a>  <span class="fu">group_by</span>(site_id) <span class="sc">%&gt;%</span></span>
+<span id="cb8-6"><a href="#cb8-6" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(</span>
+<span id="cb8-7"><a href="#cb8-7" aria-hidden="true" tabindex="-1"></a>    <span class="co"># site mean rain</span></span>
+<span id="cb8-8"><a href="#cb8-8" aria-hidden="true" tabindex="-1"></a>    <span class="at">rain_mean_site =</span> <span class="fu">mean</span>(rain_7day_mm, <span class="at">na.rm =</span> <span class="cn">TRUE</span>),</span>
+<span id="cb8-9"><a href="#cb8-9" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-10"><a href="#cb8-10" aria-hidden="true" tabindex="-1"></a>    <span class="co"># 1) Grand-mean centered rain (CGM): mixes within + between variation</span></span>
+<span id="cb8-11"><a href="#cb8-11" aria-hidden="true" tabindex="-1"></a>    <span class="at">rain_cgm =</span> rain_7day_mm <span class="sc">-</span> grand_mean_rain,</span>
+<span id="cb8-12"><a href="#cb8-12" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-13"><a href="#cb8-13" aria-hidden="true" tabindex="-1"></a>    <span class="co"># 2) Centered-within-site (CWC): “rain anomaly” vs that site’s typical rain</span></span>
+<span id="cb8-14"><a href="#cb8-14" aria-hidden="true" tabindex="-1"></a>    <span class="at">rain_cwc =</span> rain_7day_mm <span class="sc">-</span> rain_mean_site,</span>
+<span id="cb8-15"><a href="#cb8-15" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-16"><a href="#cb8-16" aria-hidden="true" tabindex="-1"></a>    <span class="co"># 3) Site mean rain, grand-mean centered: between-site component</span></span>
+<span id="cb8-17"><a href="#cb8-17" aria-hidden="true" tabindex="-1"></a>    <span class="at">rain_mean_site_cgm =</span> rain_mean_site <span class="sc">-</span> grand_mean_rain</span>
+<span id="cb8-18"><a href="#cb8-18" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">%&gt;%</span></span>
+<span id="cb8-19"><a href="#cb8-19" aria-hidden="true" tabindex="-1"></a>  <span class="fu">ungroup</span>()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+<hr>
+</section>
+<section id="plot-distribution-of-random-intercepts-site-baselines" class="level3" data-number="0.12">
+<h3 data-number="0.12" class="anchored" data-anchor-id="plot-distribution-of-random-intercepts-site-baselines"><span class="header-section-number">0.12</span> Plot: distribution of random intercepts (site baselines)</h3>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb9"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a>re_int <span class="ot">&lt;-</span> <span class="fu">ranef</span>(m1_empty)<span class="sc">$</span>site_id <span class="sc">|&gt;</span></span>
+<span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">as_tibble</span>(<span class="at">rownames =</span> <span class="st">"site_id"</span>) <span class="sc">|&gt;</span></span>
+<span id="cb9-3"><a href="#cb9-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">rename</span>(<span class="at">u0_hat =</span> <span class="st">`</span><span class="at">(Intercept)</span><span class="st">`</span>)</span>
+<span id="cb9-4"><a href="#cb9-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-5"><a href="#cb9-5" aria-hidden="true" tabindex="-1"></a><span class="fu">ggplot</span>(re_int, <span class="fu">aes</span>(u0_hat)) <span class="sc">+</span></span>
+<span id="cb9-6"><a href="#cb9-6" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_histogram</span>(<span class="at">bins =</span> <span class="dv">25</span>, <span class="at">fill =</span> <span class="st">"blue"</span>, <span class="at">color=</span><span class="st">"lightblue"</span>) <span class="sc">+</span></span>
+<span id="cb9-7"><a href="#cb9-7" aria-hidden="true" tabindex="-1"></a>  <span class="fu">labs</span>(</span>
+<span id="cb9-8"><a href="#cb9-8" aria-hidden="true" tabindex="-1"></a>    <span class="at">title =</span> <span class="st">"Random intercepts: site baseline deviations"</span>,</span>
+<span id="cb9-9"><a href="#cb9-9" aria-hidden="true" tabindex="-1"></a>    <span class="at">x =</span> <span class="st">"Estimated site deviation from the grand mean"</span>,</span>
+<span id="cb9-10"><a href="#cb9-10" aria-hidden="true" tabindex="-1"></a>    <span class="at">y =</span> <span class="st">"Number of sites"</span>) <span class="sc">+</span> <span class="fu">theme_minimal</span>()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="lab_mlm_START_files/figure-html/unnamed-chunk-9-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+</div>
+<p><strong>Q2.</strong> What does a <em>larger</em> ICC mean here? How does it change (a) effective sample size and (b) how important it is to model site differences?</p>
+<p><strong>Response:</strong> A larger ICC means that more variation comes from between site differences. Since there’s more variation &amp;overlap, a smaller effective sample size results.</p>
+<hr>
+</section>
+<section id="model-2-smushed-effect-grand-mean-centered-rainfall" class="level3" data-number="0.13">
+<h3 data-number="0.13" class="anchored" data-anchor-id="model-2-smushed-effect-grand-mean-centered-rainfall"><span class="header-section-number">0.13</span> Model 2: Smushed effect (grand-mean centered rainfall)</h3>
+<p>This model uses <code>rain_cgm</code>, which mixes within + between information into one slope.</p>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb10"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a>m2_smushed <span class="ot">&lt;-</span> <span class="fu">lmer</span>(log_nitrate <span class="sc">~</span> rain_cgm <span class="sc">+</span> (<span class="dv">1</span><span class="sc">|</span>site_id), <span class="at">data =</span> nitrate_df, <span class="at">REML =</span> <span class="cn">TRUE</span>)</span>
+<span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-3"><a href="#cb10-3" aria-hidden="true" tabindex="-1"></a><span class="fu">summ</span>(m2_smushed, <span class="at">digits =</span> <span class="dv">3</span>, <span class="at">model.fit =</span> <span class="cn">FALSE</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output-display">
+<div class="table-responsive">
+<table class="table table-striped table-hover table-condensed caption-top table-sm small">
+<tbody>
+<tr class="odd">
+<td style="text-align: left; font-weight: bold;">Observations</td>
+<td style="text-align: right;">1080</td>
+</tr>
+<tr class="even">
+<td style="text-align: left; font-weight: bold;">Dependent variable</td>
+<td style="text-align: right;">log_nitrate</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left; font-weight: bold;">Type</td>
+<td style="text-align: right;">Mixed effects linear regression</td>
+</tr>
+</tbody>
+</table>
+</div>
+  
+<div class="table-responsive">
+<table class="table table-striped table-hover table-condensed caption-top table-sm small">
+<colgroup>
+<col style="width: 16%">
+<col style="width: 16%">
+<col style="width: 16%">
+<col style="width: 16%">
+<col style="width: 16%">
+<col style="width: 16%">
+</colgroup>
+<thead>
+<tr class="header">
+<th colspan="6" data-quarto-table-cell-role="th" style="text-align: center; border-bottom: hidden; padding-bottom: 0; padding-left: 3px; padding-right: 3px;"><div style="border-bottom: 1px solid #ddd; padding-bottom: 5px; ">
+Fixed Effects
+</div></th>
+</tr>
+<tr class="even">
+<th style="text-align: left;" data-quarto-table-cell-role="th"></th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">Est.</th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">S.E.</th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">t val.</th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">d.f.</th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">p</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left; font-weight: bold;">(Intercept)</td>
+<td style="text-align: right;">0.212</td>
+<td style="text-align: right;">0.070</td>
+<td style="text-align: right;">3.022</td>
+<td style="text-align: right;">58.546</td>
+<td style="text-align: right;">0.004</td>
+</tr>
+<tr class="even">
+<td style="text-align: left; font-weight: bold;">rain_cgm</td>
+<td style="text-align: right;">0.002</td>
+<td style="text-align: right;">0.001</td>
+<td style="text-align: right;">1.435</td>
+<td style="text-align: right;">1060.382</td>
+<td style="text-align: right;">0.152</td>
+</tr>
+</tbody><tfoot>
+<tr class="odd">
+<td style="text-align: left; padding: 0;"><sup></sup> p values calculated using Satterthwaite d.f.</td>
+<td style="text-align: right;"></td>
+<td style="text-align: right;"></td>
+<td style="text-align: right;"></td>
+<td style="text-align: right;"></td>
+<td style="text-align: right;"></td>
+</tr>
+</tfoot>
+
+</table>
+</div>
+ 
+<div class="table-responsive">
+<table class="table table-striped table-hover table-condensed caption-top table-sm small">
+<colgroup>
+<col style="width: 33%">
+<col style="width: 33%">
+<col style="width: 33%">
+</colgroup>
+<thead>
+<tr class="header">
+<th colspan="3" data-quarto-table-cell-role="th" style="text-align: center; border-bottom: hidden; padding-bottom: 0; padding-left: 3px; padding-right: 3px;"><div style="border-bottom: 1px solid #ddd; padding-bottom: 5px; ">
+Random Effects
+</div></th>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">Group</th>
+<th data-quarto-table-cell-role="th">Parameter</th>
+<th data-quarto-table-cell-role="th">Std. Dev.</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>site_id</td>
+<td>(Intercept)</td>
+<td>0.517</td>
+</tr>
+<tr class="even">
+<td>Residual</td>
+<td></td>
+<td>0.719</td>
+</tr>
+</tbody>
+</table>
+</div>
+ 
+<div class="table-responsive">
+<table class="table table-striped table-hover table-condensed caption-top table-sm small">
+<colgroup>
+<col style="width: 33%">
+<col style="width: 33%">
+<col style="width: 33%">
+</colgroup>
+<thead>
+<tr class="header">
+<th colspan="3" data-quarto-table-cell-role="th" style="text-align: center; border-bottom: hidden; padding-bottom: 0; padding-left: 3px; padding-right: 3px;"><div style="border-bottom: 1px solid #ddd; padding-bottom: 5px; ">
+Grouping Variables
+</div></th>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">Group</th>
+<th data-quarto-table-cell-role="th"># groups</th>
+<th data-quarto-table-cell-role="th">ICC</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>site_id</td>
+<td>60</td>
+<td>0.341</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</div>
+</section>
+<section id="visualize-the-smushed-effect" class="level3" data-number="0.14">
+<h3 data-number="0.14" class="anchored" data-anchor-id="visualize-the-smushed-effect"><span class="header-section-number">0.14</span> Visualize the “Smushed Effect”</h3>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb11"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Between-site means</span></span>
+<span id="cb11-2"><a href="#cb11-2" aria-hidden="true" tabindex="-1"></a>site_means <span class="ot">&lt;-</span> nitrate_df <span class="sc">|&gt;</span></span>
+<span id="cb11-3"><a href="#cb11-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">group_by</span>(site_id) <span class="sc">|&gt;</span></span>
+<span id="cb11-4"><a href="#cb11-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">summarise</span>(</span>
+<span id="cb11-5"><a href="#cb11-5" aria-hidden="true" tabindex="-1"></a>    <span class="at">mean_log_nitrate =</span> <span class="fu">mean</span>(log_nitrate),</span>
+<span id="cb11-6"><a href="#cb11-6" aria-hidden="true" tabindex="-1"></a>    <span class="at">mean_rain =</span> <span class="fu">mean</span>(rain_7day_mm),</span>
+<span id="cb11-7"><a href="#cb11-7" aria-hidden="true" tabindex="-1"></a>    <span class="at">.groups =</span> <span class="st">"drop"</span></span>
+<span id="cb11-8"><a href="#cb11-8" aria-hidden="true" tabindex="-1"></a>  )</span>
+<span id="cb11-9"><a href="#cb11-9" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb11-10"><a href="#cb11-10" aria-hidden="true" tabindex="-1"></a><span class="co"># Within-site demeaned outcome </span></span>
+<span id="cb11-11"><a href="#cb11-11" aria-hidden="true" tabindex="-1"></a>within_df <span class="ot">&lt;-</span> nitrate_df <span class="sc">|&gt;</span></span>
+<span id="cb11-12"><a href="#cb11-12" aria-hidden="true" tabindex="-1"></a>  <span class="fu">group_by</span>(site_id) <span class="sc">|&gt;</span></span>
+<span id="cb11-13"><a href="#cb11-13" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(</span>
+<span id="cb11-14"><a href="#cb11-14" aria-hidden="true" tabindex="-1"></a>    <span class="at">log_nitrate_cwc =</span> log_nitrate <span class="sc">-</span> <span class="fu">mean</span>(log_nitrate)</span>
+<span id="cb11-15"><a href="#cb11-15" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">|&gt;</span></span>
+<span id="cb11-16"><a href="#cb11-16" aria-hidden="true" tabindex="-1"></a>  <span class="fu">ungroup</span>()</span>
+<span id="cb11-17"><a href="#cb11-17" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb11-18"><a href="#cb11-18" aria-hidden="true" tabindex="-1"></a>p_smushed <span class="ot">&lt;-</span> <span class="fu">ggplot</span>(nitrate_df, <span class="fu">aes</span>(rain_7day_mm, log_nitrate)) <span class="sc">+</span></span>
+<span id="cb11-19"><a href="#cb11-19" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_point</span>(<span class="at">alpha =</span> <span class="fl">0.15</span>) <span class="sc">+</span></span>
+<span id="cb11-20"><a href="#cb11-20" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_smooth</span>(<span class="at">method =</span> <span class="st">"lm"</span>, <span class="at">se =</span> <span class="cn">FALSE</span>) <span class="sc">+</span></span>
+<span id="cb11-21"><a href="#cb11-21" aria-hidden="true" tabindex="-1"></a>  <span class="fu">labs</span>(<span class="at">title =</span> <span class="st">"SMUSHED (all observations)"</span>, <span class="at">x =</span> <span class="st">"7-day rain (mm)"</span>, <span class="at">y =</span> <span class="st">"log(nitrate)"</span>)</span>
+<span id="cb11-22"><a href="#cb11-22" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb11-23"><a href="#cb11-23" aria-hidden="true" tabindex="-1"></a>p_within <span class="ot">&lt;-</span> <span class="fu">ggplot</span>(within_df, <span class="fu">aes</span>(rain_cwc, log_nitrate_cwc)) <span class="sc">+</span></span>
+<span id="cb11-24"><a href="#cb11-24" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_point</span>(<span class="at">alpha =</span> <span class="fl">0.15</span>) <span class="sc">+</span></span>
+<span id="cb11-25"><a href="#cb11-25" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_smooth</span>(<span class="at">method =</span> <span class="st">"lm"</span>, <span class="at">se =</span> <span class="cn">FALSE</span>) <span class="sc">+</span></span>
+<span id="cb11-26"><a href="#cb11-26" aria-hidden="true" tabindex="-1"></a>  <span class="fu">labs</span>(<span class="at">title =</span> <span class="st">"WITHIN (demeaned by site)"</span>, <span class="at">x =</span> <span class="st">"Rain anomaly within site (CWC)"</span>, <span class="at">y =</span> <span class="st">"Nitrate anomaly within site"</span>)</span>
+<span id="cb11-27"><a href="#cb11-27" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb11-28"><a href="#cb11-28" aria-hidden="true" tabindex="-1"></a>p_between <span class="ot">&lt;-</span> <span class="fu">ggplot</span>(site_means, <span class="fu">aes</span>(mean_rain, mean_log_nitrate)) <span class="sc">+</span></span>
+<span id="cb11-29"><a href="#cb11-29" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_point</span>(<span class="at">alpha =</span> <span class="fl">0.85</span>) <span class="sc">+</span></span>
+<span id="cb11-30"><a href="#cb11-30" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_smooth</span>(<span class="at">method =</span> <span class="st">"lm"</span>, <span class="at">se =</span> <span class="cn">FALSE</span>) <span class="sc">+</span></span>
+<span id="cb11-31"><a href="#cb11-31" aria-hidden="true" tabindex="-1"></a>  <span class="fu">labs</span>(<span class="at">title =</span> <span class="st">"BETWEEN (site means)"</span>, <span class="at">x =</span> <span class="st">"Mean rain by site"</span>, <span class="at">y =</span> <span class="st">"Mean log(nitrate) by site"</span>)</span>
+<span id="cb11-32"><a href="#cb11-32" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb11-33"><a href="#cb11-33" aria-hidden="true" tabindex="-1"></a>(p_smushed <span class="sc">|</span> p_within <span class="sc">|</span> p_between) <span class="sc">+</span></span>
+<span id="cb11-34"><a href="#cb11-34" aria-hidden="true" tabindex="-1"></a>  <span class="fu">plot_annotation</span>(</span>
+<span id="cb11-35"><a href="#cb11-35" aria-hidden="true" tabindex="-1"></a>    <span class="at">title =</span> <span class="st">"Why the smushed effect can be misleading"</span>,</span>
+<span id="cb11-36"><a href="#cb11-36" aria-hidden="true" tabindex="-1"></a>    <span class="at">subtitle =</span> <span class="st">"If within and between effects differ in direction, the combined slope can cancel out."</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="lab_mlm_START_files/figure-html/unnamed-chunk-11-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+</div>
+<p><strong>Q3.</strong> In one or two sentences: what does it mean that the smushed effect is a “blend”? Use the three-panel figure to support your explanation.</p>
+<p><strong>Response:</strong> Looking at the within and between plots, one slope is slightly positive while the other is very negative. The smushed effect is a combination between these two as it’s resulting in a slightly negative slope.</p>
+<hr>
+</section>
+<section id="model-3-within-site-effect-cwc" class="level2" data-number="1">
+<h2 data-number="1" class="anchored" data-anchor-id="model-3-within-site-effect-cwc"><span class="header-section-number">1</span> Model 3: Within-site effect (CWC)</h2>
+<p>This targets the within-site question:</p>
+<blockquote class="blockquote">
+<p>“When rainfall is higher than usual for the same site, does nitrate change?”</p>
+</blockquote>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb12"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a>m3_within <span class="ot">&lt;-</span> <span class="fu">lmer</span>(log_nitrate <span class="sc">~</span> rain_cwc <span class="sc">+</span> (<span class="dv">1</span><span class="sc">|</span>site_id), <span class="at">data =</span> nitrate_df)</span>
+<span id="cb12-2"><a href="#cb12-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-3"><a href="#cb12-3" aria-hidden="true" tabindex="-1"></a><span class="fu">summ</span>(m3_within, <span class="at">digits =</span> <span class="dv">3</span>, <span class="at">model.fit =</span> <span class="cn">FALSE</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output-display">
+<div class="table-responsive">
+<table class="table table-striped table-hover table-condensed caption-top table-sm small">
+<tbody>
+<tr class="odd">
+<td style="text-align: left; font-weight: bold;">Observations</td>
+<td style="text-align: right;">1080</td>
+</tr>
+<tr class="even">
+<td style="text-align: left; font-weight: bold;">Dependent variable</td>
+<td style="text-align: right;">log_nitrate</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left; font-weight: bold;">Type</td>
+<td style="text-align: right;">Mixed effects linear regression</td>
+</tr>
+</tbody>
+</table>
+</div>
+  
+<div class="table-responsive">
+<table class="table table-striped table-hover table-condensed caption-top table-sm small">
+<colgroup>
+<col style="width: 16%">
+<col style="width: 16%">
+<col style="width: 16%">
+<col style="width: 16%">
+<col style="width: 16%">
+<col style="width: 16%">
+</colgroup>
+<thead>
+<tr class="header">
+<th colspan="6" data-quarto-table-cell-role="th" style="text-align: center; border-bottom: hidden; padding-bottom: 0; padding-left: 3px; padding-right: 3px;"><div style="border-bottom: 1px solid #ddd; padding-bottom: 5px; ">
+Fixed Effects
+</div></th>
+</tr>
+<tr class="even">
+<th style="text-align: left;" data-quarto-table-cell-role="th"></th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">Est.</th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">S.E.</th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">t val.</th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">d.f.</th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">p</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left; font-weight: bold;">(Intercept)</td>
+<td style="text-align: right;">0.212</td>
+<td style="text-align: right;">0.069</td>
+<td style="text-align: right;">3.057</td>
+<td style="text-align: right;">59.000</td>
+<td style="text-align: right;">0.003</td>
+</tr>
+<tr class="even">
+<td style="text-align: left; font-weight: bold;">rain_cwc</td>
+<td style="text-align: right;">0.003</td>
+<td style="text-align: right;">0.002</td>
+<td style="text-align: right;">1.899</td>
+<td style="text-align: right;">1019.000</td>
+<td style="text-align: right;">0.058</td>
+</tr>
+</tbody><tfoot>
+<tr class="odd">
+<td style="text-align: left; padding: 0;"><sup></sup> p values calculated using Satterthwaite d.f.</td>
+<td style="text-align: right;"></td>
+<td style="text-align: right;"></td>
+<td style="text-align: right;"></td>
+<td style="text-align: right;"></td>
+<td style="text-align: right;"></td>
+</tr>
+</tfoot>
+
+</table>
+</div>
+ 
+<div class="table-responsive">
+<table class="table table-striped table-hover table-condensed caption-top table-sm small">
+<colgroup>
+<col style="width: 33%">
+<col style="width: 33%">
+<col style="width: 33%">
+</colgroup>
+<thead>
+<tr class="header">
+<th colspan="3" data-quarto-table-cell-role="th" style="text-align: center; border-bottom: hidden; padding-bottom: 0; padding-left: 3px; padding-right: 3px;"><div style="border-bottom: 1px solid #ddd; padding-bottom: 5px; ">
+Random Effects
+</div></th>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">Group</th>
+<th data-quarto-table-cell-role="th">Parameter</th>
+<th data-quarto-table-cell-role="th">Std. Dev.</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>site_id</td>
+<td>(Intercept)</td>
+<td>0.510</td>
+</tr>
+<tr class="even">
+<td>Residual</td>
+<td></td>
+<td>0.719</td>
+</tr>
+</tbody>
+</table>
+</div>
+ 
+<div class="table-responsive">
+<table class="table table-striped table-hover table-condensed caption-top table-sm small">
+<colgroup>
+<col style="width: 33%">
+<col style="width: 33%">
+<col style="width: 33%">
+</colgroup>
+<thead>
+<tr class="header">
+<th colspan="3" data-quarto-table-cell-role="th" style="text-align: center; border-bottom: hidden; padding-bottom: 0; padding-left: 3px; padding-right: 3px;"><div style="border-bottom: 1px solid #ddd; padding-bottom: 5px; ">
+Grouping Variables
+</div></th>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">Group</th>
+<th data-quarto-table-cell-role="th"># groups</th>
+<th data-quarto-table-cell-role="th">ICC</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>site_id</td>
+<td>60</td>
+<td>0.335</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</div>
+<section id="plot-within-site-relationship-anomalies" class="level3" data-number="1.1">
+<h3 data-number="1.1" class="anchored" data-anchor-id="plot-within-site-relationship-anomalies"><span class="header-section-number">1.1</span> Plot: within-site relationship (anomalies)</h3>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb13"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb13-1"><a href="#cb13-1" aria-hidden="true" tabindex="-1"></a><span class="fu">ggplot</span>(within_df, <span class="fu">aes</span>(rain_cwc, log_nitrate_cwc)) <span class="sc">+</span></span>
+<span id="cb13-2"><a href="#cb13-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_point</span>(<span class="at">alpha =</span> <span class="fl">0.15</span>) <span class="sc">+</span></span>
+<span id="cb13-3"><a href="#cb13-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_smooth</span>(<span class="at">method =</span> <span class="st">"lm"</span>, <span class="at">se =</span> <span class="cn">TRUE</span>) <span class="sc">+</span></span>
+<span id="cb13-4"><a href="#cb13-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">labs</span>(</span>
+<span id="cb13-5"><a href="#cb13-5" aria-hidden="true" tabindex="-1"></a>    <span class="at">title =</span> <span class="st">"Within-site effect: rain anomalies vs nitrate anomalies"</span>,</span>
+<span id="cb13-6"><a href="#cb13-6" aria-hidden="true" tabindex="-1"></a>    <span class="at">subtitle =</span> <span class="st">"This isolates variation within the same site over time"</span>,</span>
+<span id="cb13-7"><a href="#cb13-7" aria-hidden="true" tabindex="-1"></a>    <span class="at">x =</span> <span class="st">"Rain anomaly within site (mm)"</span>,</span>
+<span id="cb13-8"><a href="#cb13-8" aria-hidden="true" tabindex="-1"></a>    <span class="at">y =</span> <span class="st">"Nitrate anomaly within site (demeaned log scale)"</span></span>
+<span id="cb13-9"><a href="#cb13-9" aria-hidden="true" tabindex="-1"></a>  )</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="lab_mlm_START_files/figure-html/unnamed-chunk-13-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+</div>
+<p><strong>Q4.</strong> Interpret the within-site coefficient in plain English (direction + unit).</p>
+<p><strong>Response:</strong> An increase of 1mm in rain anomaly is associated with log(0.003) units change in log nitrate.</p>
+<hr>
+</section>
+<section id="model-4-between-site-effect-site-mean-rainfall" class="level3" data-number="1.2">
+<h3 data-number="1.2" class="anchored" data-anchor-id="model-4-between-site-effect-site-mean-rainfall"><span class="header-section-number">1.2</span> 6. Model 4: Between-site effect (site mean rainfall)</h3>
+<p>This targets the between-site question:</p>
+<blockquote class="blockquote">
+<p>“Do wetter sites (on average) have different average nitrate?”</p>
+</blockquote>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb14"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb14-1"><a href="#cb14-1" aria-hidden="true" tabindex="-1"></a>m4_between <span class="ot">&lt;-</span> <span class="fu">lmer</span>(log_nitrate <span class="sc">~</span> rain_mean_site_cgm <span class="sc">+</span> (<span class="dv">1</span> <span class="sc">|</span> site_id),</span>
+<span id="cb14-2"><a href="#cb14-2" aria-hidden="true" tabindex="-1"></a>  <span class="at">data =</span> nitrate_df,</span>
+<span id="cb14-3"><a href="#cb14-3" aria-hidden="true" tabindex="-1"></a>  <span class="at">REML =</span> <span class="cn">TRUE</span>)</span>
+<span id="cb14-4"><a href="#cb14-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb14-5"><a href="#cb14-5" aria-hidden="true" tabindex="-1"></a><span class="fu">summ</span>(m4_between, <span class="at">digits =</span> <span class="dv">3</span>, <span class="at">model.fit =</span> <span class="cn">FALSE</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output-display">
+<div class="table-responsive">
+<table class="table table-striped table-hover table-condensed caption-top table-sm small">
+<tbody>
+<tr class="odd">
+<td style="text-align: left; font-weight: bold;">Observations</td>
+<td style="text-align: right;">1080</td>
+</tr>
+<tr class="even">
+<td style="text-align: left; font-weight: bold;">Dependent variable</td>
+<td style="text-align: right;">log_nitrate</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left; font-weight: bold;">Type</td>
+<td style="text-align: right;">Mixed effects linear regression</td>
+</tr>
+</tbody>
+</table>
+</div>
+  
+<div class="table-responsive">
+<table class="table table-striped table-hover table-condensed caption-top table-sm small">
+<colgroup>
+<col style="width: 16%">
+<col style="width: 16%">
+<col style="width: 16%">
+<col style="width: 16%">
+<col style="width: 16%">
+<col style="width: 16%">
+</colgroup>
+<thead>
+<tr class="header">
+<th colspan="6" data-quarto-table-cell-role="th" style="text-align: center; border-bottom: hidden; padding-bottom: 0; padding-left: 3px; padding-right: 3px;"><div style="border-bottom: 1px solid #ddd; padding-bottom: 5px; ">
+Fixed Effects
+</div></th>
+</tr>
+<tr class="even">
+<th style="text-align: left;" data-quarto-table-cell-role="th"></th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">Est.</th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">S.E.</th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">t val.</th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">d.f.</th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">p</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left; font-weight: bold;">(Intercept)</td>
+<td style="text-align: right;">0.212</td>
+<td style="text-align: right;">0.065</td>
+<td style="text-align: right;">3.252</td>
+<td style="text-align: right;">58.000</td>
+<td style="text-align: right;">0.002</td>
+</tr>
+<tr class="even">
+<td style="text-align: left; font-weight: bold;">rain_mean_site_cgm</td>
+<td style="text-align: right;">-0.026</td>
+<td style="text-align: right;">0.009</td>
+<td style="text-align: right;">-2.960</td>
+<td style="text-align: right;">58.000</td>
+<td style="text-align: right;">0.004</td>
+</tr>
+</tbody><tfoot>
+<tr class="odd">
+<td style="text-align: left; padding: 0;"><sup></sup> p values calculated using Satterthwaite d.f.</td>
+<td style="text-align: right;"></td>
+<td style="text-align: right;"></td>
+<td style="text-align: right;"></td>
+<td style="text-align: right;"></td>
+<td style="text-align: right;"></td>
+</tr>
+</tfoot>
+
+</table>
+</div>
+ 
+<div class="table-responsive">
+<table class="table table-striped table-hover table-condensed caption-top table-sm small">
+<colgroup>
+<col style="width: 33%">
+<col style="width: 33%">
+<col style="width: 33%">
+</colgroup>
+<thead>
+<tr class="header">
+<th colspan="3" data-quarto-table-cell-role="th" style="text-align: center; border-bottom: hidden; padding-bottom: 0; padding-left: 3px; padding-right: 3px;"><div style="border-bottom: 1px solid #ddd; padding-bottom: 5px; ">
+Random Effects
+</div></th>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">Group</th>
+<th data-quarto-table-cell-role="th">Parameter</th>
+<th data-quarto-table-cell-role="th">Std. Dev.</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>site_id</td>
+<td>(Intercept)</td>
+<td>0.476</td>
+</tr>
+<tr class="even">
+<td>Residual</td>
+<td></td>
+<td>0.720</td>
+</tr>
+</tbody>
+</table>
+</div>
+ 
+<div class="table-responsive">
+<table class="table table-striped table-hover table-condensed caption-top table-sm small">
+<colgroup>
+<col style="width: 33%">
+<col style="width: 33%">
+<col style="width: 33%">
+</colgroup>
+<thead>
+<tr class="header">
+<th colspan="3" data-quarto-table-cell-role="th" style="text-align: center; border-bottom: hidden; padding-bottom: 0; padding-left: 3px; padding-right: 3px;"><div style="border-bottom: 1px solid #ddd; padding-bottom: 5px; ">
+Grouping Variables
+</div></th>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">Group</th>
+<th data-quarto-table-cell-role="th"># groups</th>
+<th data-quarto-table-cell-role="th">ICC</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>site_id</td>
+<td>60</td>
+<td>0.304</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</div>
+</section>
+<section id="plot-between-site-means" class="level3" data-number="1.3">
+<h3 data-number="1.3" class="anchored" data-anchor-id="plot-between-site-means"><span class="header-section-number">1.3</span> Plot: between-site means</h3>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb15"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb15-1"><a href="#cb15-1" aria-hidden="true" tabindex="-1"></a><span class="fu">ggplot</span>(site_means, <span class="fu">aes</span>(mean_rain, mean_log_nitrate)) <span class="sc">+</span></span>
+<span id="cb15-2"><a href="#cb15-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_point</span>(<span class="at">alpha =</span> <span class="fl">0.85</span>) <span class="sc">+</span></span>
+<span id="cb15-3"><a href="#cb15-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_smooth</span>(<span class="at">method =</span> <span class="st">"lm"</span>, <span class="at">se =</span> <span class="cn">TRUE</span>) <span class="sc">+</span></span>
+<span id="cb15-4"><a href="#cb15-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">labs</span>(</span>
+<span id="cb15-5"><a href="#cb15-5" aria-hidden="true" tabindex="-1"></a>    <span class="at">title =</span> <span class="st">"Between-site effect: site mean rain vs site mean nitrate"</span>,</span>
+<span id="cb15-6"><a href="#cb15-6" aria-hidden="true" tabindex="-1"></a>    <span class="at">x =</span> <span class="st">"Mean rain by site (mm)"</span>,</span>
+<span id="cb15-7"><a href="#cb15-7" aria-hidden="true" tabindex="-1"></a>    <span class="at">y =</span> <span class="st">"Mean log(nitrate) by site"</span></span>
+<span id="cb15-8"><a href="#cb15-8" aria-hidden="true" tabindex="-1"></a>  )</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="lab_mlm_START_files/figure-html/unnamed-chunk-15-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+</div>
+<p><strong>Q5.</strong> Why might the between-site relationship differ from the within-site relationship? Give one plausible environmental mechanism or confounder.</p>
+<p><strong>Response:</strong> Between-site differences may include land uses differences. For example, lakes near farms would have high nitrate and be more influenced by rain.</p>
+<hr>
+</section>
+<section id="model-5-within-between-together-clean-separation" class="level3" data-number="1.4">
+<h3 data-number="1.4" class="anchored" data-anchor-id="model-5-within-between-together-clean-separation"><span class="header-section-number">1.4</span> Model 5: Within + Between together (clean separation)</h3>
+<p>This specification provides separate within- and between-level rain effects.</p>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb16"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb16-1"><a href="#cb16-1" aria-hidden="true" tabindex="-1"></a>m5_within_between <span class="ot">&lt;-</span> <span class="fu">lmer</span>(log_nitrate <span class="sc">~</span> rain_cwc <span class="sc">+</span> rain_mean_site_cgm <span class="sc">+</span> (<span class="dv">1</span> <span class="sc">|</span> site_id),</span>
+<span id="cb16-2"><a href="#cb16-2" aria-hidden="true" tabindex="-1"></a>  <span class="at">data =</span> nitrate_df,</span>
+<span id="cb16-3"><a href="#cb16-3" aria-hidden="true" tabindex="-1"></a>  <span class="at">REML =</span> <span class="cn">TRUE</span>)</span>
+<span id="cb16-4"><a href="#cb16-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-5"><a href="#cb16-5" aria-hidden="true" tabindex="-1"></a><span class="fu">summ</span>(m5_within_between, <span class="at">digits =</span> <span class="dv">3</span>, <span class="at">model.fit =</span> <span class="cn">FALSE</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output-display">
+<div class="table-responsive">
+<table class="table table-striped table-hover table-condensed caption-top table-sm small">
+<tbody>
+<tr class="odd">
+<td style="text-align: left; font-weight: bold;">Observations</td>
+<td style="text-align: right;">1080</td>
+</tr>
+<tr class="even">
+<td style="text-align: left; font-weight: bold;">Dependent variable</td>
+<td style="text-align: right;">log_nitrate</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left; font-weight: bold;">Type</td>
+<td style="text-align: right;">Mixed effects linear regression</td>
+</tr>
+</tbody>
+</table>
+</div>
+  
+<div class="table-responsive">
+<table class="table table-striped table-hover table-condensed caption-top table-sm small">
+<colgroup>
+<col style="width: 16%">
+<col style="width: 16%">
+<col style="width: 16%">
+<col style="width: 16%">
+<col style="width: 16%">
+<col style="width: 16%">
+</colgroup>
+<thead>
+<tr class="header">
+<th colspan="6" data-quarto-table-cell-role="th" style="text-align: center; border-bottom: hidden; padding-bottom: 0; padding-left: 3px; padding-right: 3px;"><div style="border-bottom: 1px solid #ddd; padding-bottom: 5px; ">
+Fixed Effects
+</div></th>
+</tr>
+<tr class="even">
+<th style="text-align: left;" data-quarto-table-cell-role="th"></th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">Est.</th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">S.E.</th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">t val.</th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">d.f.</th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">p</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left; font-weight: bold;">(Intercept)</td>
+<td style="text-align: right;">0.212</td>
+<td style="text-align: right;">0.065</td>
+<td style="text-align: right;">3.252</td>
+<td style="text-align: right;">58.000</td>
+<td style="text-align: right;">0.002</td>
+</tr>
+<tr class="even">
+<td style="text-align: left; font-weight: bold;">rain_cwc</td>
+<td style="text-align: right;">0.003</td>
+<td style="text-align: right;">0.002</td>
+<td style="text-align: right;">1.899</td>
+<td style="text-align: right;">1019.000</td>
+<td style="text-align: right;">0.058</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left; font-weight: bold;">rain_mean_site_cgm</td>
+<td style="text-align: right;">-0.026</td>
+<td style="text-align: right;">0.009</td>
+<td style="text-align: right;">-2.960</td>
+<td style="text-align: right;">58.000</td>
+<td style="text-align: right;">0.004</td>
+</tr>
+</tbody><tfoot>
+<tr class="odd">
+<td style="text-align: left; padding: 0;"><sup></sup> p values calculated using Satterthwaite d.f.</td>
+<td style="text-align: right;"></td>
+<td style="text-align: right;"></td>
+<td style="text-align: right;"></td>
+<td style="text-align: right;"></td>
+<td style="text-align: right;"></td>
+</tr>
+</tfoot>
+
+</table>
+</div>
+ 
+<div class="table-responsive">
+<table class="table table-striped table-hover table-condensed caption-top table-sm small">
+<colgroup>
+<col style="width: 33%">
+<col style="width: 33%">
+<col style="width: 33%">
+</colgroup>
+<thead>
+<tr class="header">
+<th colspan="3" data-quarto-table-cell-role="th" style="text-align: center; border-bottom: hidden; padding-bottom: 0; padding-left: 3px; padding-right: 3px;"><div style="border-bottom: 1px solid #ddd; padding-bottom: 5px; ">
+Random Effects
+</div></th>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">Group</th>
+<th data-quarto-table-cell-role="th">Parameter</th>
+<th data-quarto-table-cell-role="th">Std. Dev.</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>site_id</td>
+<td>(Intercept)</td>
+<td>0.476</td>
+</tr>
+<tr class="even">
+<td>Residual</td>
+<td></td>
+<td>0.719</td>
+</tr>
+</tbody>
+</table>
+</div>
+ 
+<div class="table-responsive">
+<table class="table table-striped table-hover table-condensed caption-top table-sm small">
+<colgroup>
+<col style="width: 33%">
+<col style="width: 33%">
+<col style="width: 33%">
+</colgroup>
+<thead>
+<tr class="header">
+<th colspan="3" data-quarto-table-cell-role="th" style="text-align: center; border-bottom: hidden; padding-bottom: 0; padding-left: 3px; padding-right: 3px;"><div style="border-bottom: 1px solid #ddd; padding-bottom: 5px; ">
+Grouping Variables
+</div></th>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">Group</th>
+<th data-quarto-table-cell-role="th"># groups</th>
+<th data-quarto-table-cell-role="th">ICC</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>site_id</td>
+<td>60</td>
+<td>0.305</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</div>
+</section>
+<section id="plot-marginal-relationships-for-both-effects" class="level3" data-number="1.5">
+<h3 data-number="1.5" class="anchored" data-anchor-id="plot-marginal-relationships-for-both-effects"><span class="header-section-number">1.5</span> Plot: marginal relationships for both effects</h3>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb17"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb17-1"><a href="#cb17-1" aria-hidden="true" tabindex="-1"></a>p1 <span class="ot">&lt;-</span> <span class="fu">plot</span>(<span class="fu">ggpredict</span>(m5_within_between, <span class="at">terms =</span> <span class="st">"rain_cwc [all]"</span>)) <span class="sc">+</span></span>
+<span id="cb17-2"><a href="#cb17-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">labs</span>(<span class="at">title =</span> <span class="st">"Within effect (CWC)"</span>, <span class="at">x =</span> <span class="st">"Rain anomaly (mm)"</span>, <span class="at">y =</span> <span class="st">"Predicted log(nitrate)"</span>)</span>
+<span id="cb17-3"><a href="#cb17-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb17-4"><a href="#cb17-4" aria-hidden="true" tabindex="-1"></a>p2 <span class="ot">&lt;-</span> <span class="fu">plot</span>(<span class="fu">ggpredict</span>(m5_within_between, <span class="at">terms =</span> <span class="st">"rain_mean_site_cgm [all]"</span>)) <span class="sc">+</span></span>
+<span id="cb17-5"><a href="#cb17-5" aria-hidden="true" tabindex="-1"></a>  <span class="fu">labs</span>(<span class="at">title =</span> <span class="st">"Between effect (site mean)"</span>, <span class="at">x =</span> <span class="st">"Site mean rain (CGM)"</span>, <span class="at">y =</span> <span class="st">"Predicted log(nitrate)"</span>)</span>
+<span id="cb17-6"><a href="#cb17-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb17-7"><a href="#cb17-7" aria-hidden="true" tabindex="-1"></a>p1 <span class="sc">|</span> p2</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="lab_mlm_START_files/figure-html/unnamed-chunk-17-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+</div>
+<p><strong>Q6.</strong> Write a sentence that communicates both the within and between findings.</p>
+<p><strong>Response:</strong> When rainfall has a high anomaly within sites, nitrate is higher but this is a weak effect and barely significant. Between sites, sites that have higher rainfall have lower nitrate and this is a stronger effect and statistically significant.</p>
+<hr>
+</section>
+<section id="model-7-random-slopes-site-specific-within-effects" class="level3" data-number="1.6">
+<h3 data-number="1.6" class="anchored" data-anchor-id="model-7-random-slopes-site-specific-within-effects"><span class="header-section-number">1.6</span> 9. Model 7: Random slopes (site-specific within effects)</h3>
+<p>Now we allow the within-site rain effect to vary by site:</p>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb18"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb18-1"><a href="#cb18-1" aria-hidden="true" tabindex="-1"></a>m7_rand_slope <span class="ot">&lt;-</span> <span class="fu">lmer</span>(log_nitrate <span class="sc">~</span> rain_cwc <span class="sc">+</span> rain_mean_site_cgm <span class="sc">+</span> temp_cwc <span class="sc">+</span> landuse_ag_cgm <span class="sc">+</span> (<span class="dv">1</span> <span class="sc">+</span> rain_cwc <span class="sc">|</span> site_id),</span>
+<span id="cb18-2"><a href="#cb18-2" aria-hidden="true" tabindex="-1"></a>  <span class="at">data =</span> nitrate_df,</span>
+<span id="cb18-3"><a href="#cb18-3" aria-hidden="true" tabindex="-1"></a>  <span class="at">REML =</span> <span class="cn">TRUE</span>)</span>
+<span id="cb18-4"><a href="#cb18-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-5"><a href="#cb18-5" aria-hidden="true" tabindex="-1"></a><span class="fu">summ</span>(m7_rand_slope , <span class="at">digits =</span> <span class="dv">3</span>, <span class="at">model.fit =</span> <span class="cn">FALSE</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output-display">
+<div class="table-responsive">
+<table class="table table-striped table-hover table-condensed caption-top table-sm small">
+<tbody>
+<tr class="odd">
+<td style="text-align: left; font-weight: bold;">Observations</td>
+<td style="text-align: right;">1080</td>
+</tr>
+<tr class="even">
+<td style="text-align: left; font-weight: bold;">Dependent variable</td>
+<td style="text-align: right;">log_nitrate</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left; font-weight: bold;">Type</td>
+<td style="text-align: right;">Mixed effects linear regression</td>
+</tr>
+</tbody>
+</table>
+</div>
+  
+<div class="table-responsive">
+<table class="table table-striped table-hover table-condensed caption-top table-sm small">
+<colgroup>
+<col style="width: 16%">
+<col style="width: 16%">
+<col style="width: 16%">
+<col style="width: 16%">
+<col style="width: 16%">
+<col style="width: 16%">
+</colgroup>
+<thead>
+<tr class="header">
+<th colspan="6" data-quarto-table-cell-role="th" style="text-align: center; border-bottom: hidden; padding-bottom: 0; padding-left: 3px; padding-right: 3px;"><div style="border-bottom: 1px solid #ddd; padding-bottom: 5px; ">
+Fixed Effects
+</div></th>
+</tr>
+<tr class="even">
+<th style="text-align: left;" data-quarto-table-cell-role="th"></th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">Est.</th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">S.E.</th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">t val.</th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">d.f.</th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">p</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left; font-weight: bold;">(Intercept)</td>
+<td style="text-align: right;">0.212</td>
+<td style="text-align: right;">0.057</td>
+<td style="text-align: right;">3.691</td>
+<td style="text-align: right;">56.683</td>
+<td style="text-align: right;">0.001</td>
+</tr>
+<tr class="even">
+<td style="text-align: left; font-weight: bold;">rain_cwc</td>
+<td style="text-align: right;">0.010</td>
+<td style="text-align: right;">0.003</td>
+<td style="text-align: right;">2.920</td>
+<td style="text-align: right;">58.941</td>
+<td style="text-align: right;">0.005</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left; font-weight: bold;">rain_mean_site_cgm</td>
+<td style="text-align: right;">-0.030</td>
+<td style="text-align: right;">0.008</td>
+<td style="text-align: right;">-3.896</td>
+<td style="text-align: right;">56.035</td>
+<td style="text-align: right;">0.000</td>
+</tr>
+<tr class="even">
+<td style="text-align: left; font-weight: bold;">temp_cwc</td>
+<td style="text-align: right;">-0.015</td>
+<td style="text-align: right;">0.004</td>
+<td style="text-align: right;">-3.938</td>
+<td style="text-align: right;">982.513</td>
+<td style="text-align: right;">0.000</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left; font-weight: bold;">landuse_ag_cgm</td>
+<td style="text-align: right;">1.317</td>
+<td style="text-align: right;">0.304</td>
+<td style="text-align: right;">4.340</td>
+<td style="text-align: right;">56.707</td>
+<td style="text-align: right;">0.000</td>
+</tr>
+</tbody><tfoot>
+<tr class="odd">
+<td style="text-align: left; padding: 0;"><sup></sup> p values calculated using Satterthwaite d.f.</td>
+<td style="text-align: right;"></td>
+<td style="text-align: right;"></td>
+<td style="text-align: right;"></td>
+<td style="text-align: right;"></td>
+<td style="text-align: right;"></td>
+</tr>
+</tfoot>
+
+</table>
+</div>
+ 
+<div class="table-responsive">
+<table class="table table-striped table-hover table-condensed caption-top table-sm small">
+<colgroup>
+<col style="width: 33%">
+<col style="width: 33%">
+<col style="width: 33%">
+</colgroup>
+<thead>
+<tr class="header">
+<th colspan="3" data-quarto-table-cell-role="th" style="text-align: center; border-bottom: hidden; padding-bottom: 0; padding-left: 3px; padding-right: 3px;"><div style="border-bottom: 1px solid #ddd; padding-bottom: 5px; ">
+Random Effects
+</div></th>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">Group</th>
+<th data-quarto-table-cell-role="th">Parameter</th>
+<th data-quarto-table-cell-role="th">Std. Dev.</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>site_id</td>
+<td>(Intercept)</td>
+<td>0.420</td>
+</tr>
+<tr class="even">
+<td>site_id</td>
+<td>rain_cwc</td>
+<td>0.022</td>
+</tr>
+<tr class="odd">
+<td>Residual</td>
+<td></td>
+<td>0.627</td>
+</tr>
+</tbody>
+</table>
+</div>
+ 
+<div class="table-responsive">
+<table class="table table-striped table-hover table-condensed caption-top table-sm small">
+<colgroup>
+<col style="width: 33%">
+<col style="width: 33%">
+<col style="width: 33%">
+</colgroup>
+<thead>
+<tr class="header">
+<th colspan="3" data-quarto-table-cell-role="th" style="text-align: center; border-bottom: hidden; padding-bottom: 0; padding-left: 3px; padding-right: 3px;"><div style="border-bottom: 1px solid #ddd; padding-bottom: 5px; ">
+Grouping Variables
+</div></th>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">Group</th>
+<th data-quarto-table-cell-role="th"># groups</th>
+<th data-quarto-table-cell-role="th">ICC</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>site_id</td>
+<td>60</td>
+<td>0.309</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</div>
+</section>
+<section id="plot-site-specific-fitted-slopes" class="level3" data-number="1.7">
+<h3 data-number="1.7" class="anchored" data-anchor-id="plot-site-specific-fitted-slopes"><span class="header-section-number">1.7</span> Plot: Site-specific fitted slopes</h3>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb19"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb19-1"><a href="#cb19-1" aria-hidden="true" tabindex="-1"></a>some_sites <span class="ot">&lt;-</span> nitrate_df <span class="sc">|&gt;</span> <span class="fu">distinct</span>(site_id) <span class="sc">|&gt;</span> <span class="fu">slice_head</span>(<span class="at">n =</span> <span class="dv">12</span>) <span class="sc">|&gt;</span> <span class="fu">pull</span>(site_id)</span>
+<span id="cb19-2"><a href="#cb19-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb19-3"><a href="#cb19-3" aria-hidden="true" tabindex="-1"></a>grid_df <span class="ot">&lt;-</span> nitrate_df <span class="sc">|&gt;</span></span>
+<span id="cb19-4"><a href="#cb19-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(site_id <span class="sc">%in%</span> some_sites) <span class="sc">|&gt;</span></span>
+<span id="cb19-5"><a href="#cb19-5" aria-hidden="true" tabindex="-1"></a>  <span class="fu">group_by</span>(site_id) <span class="sc">|&gt;</span></span>
+<span id="cb19-6"><a href="#cb19-6" aria-hidden="true" tabindex="-1"></a>  <span class="fu">reframe</span>(</span>
+<span id="cb19-7"><a href="#cb19-7" aria-hidden="true" tabindex="-1"></a>    <span class="at">rain_cwc =</span> <span class="fu">seq</span>(<span class="fu">min</span>(rain_cwc), <span class="fu">max</span>(rain_cwc), <span class="at">length.out =</span> <span class="dv">30</span>),</span>
+<span id="cb19-8"><a href="#cb19-8" aria-hidden="true" tabindex="-1"></a>    <span class="at">rain_mean_site_cgm =</span> <span class="fu">first</span>(rain_mean_site_cgm),</span>
+<span id="cb19-9"><a href="#cb19-9" aria-hidden="true" tabindex="-1"></a>    <span class="at">temp_cwc =</span> <span class="dv">0</span>,</span>
+<span id="cb19-10"><a href="#cb19-10" aria-hidden="true" tabindex="-1"></a>    <span class="at">landuse_ag_cgm =</span> <span class="fu">first</span>(landuse_ag_cgm),</span>
+<span id="cb19-11"><a href="#cb19-11" aria-hidden="true" tabindex="-1"></a>    <span class="at">.groups =</span> <span class="st">"drop"</span></span>
+<span id="cb19-12"><a href="#cb19-12" aria-hidden="true" tabindex="-1"></a>  )</span>
+<span id="cb19-13"><a href="#cb19-13" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb19-14"><a href="#cb19-14" aria-hidden="true" tabindex="-1"></a>grid_df<span class="sc">$</span>pred <span class="ot">&lt;-</span> <span class="fu">predict</span>(m7_rand_slope, <span class="at">newdata =</span> grid_df, <span class="at">re.form =</span> <span class="cn">NULL</span>)</span>
+<span id="cb19-15"><a href="#cb19-15" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb19-16"><a href="#cb19-16" aria-hidden="true" tabindex="-1"></a><span class="fu">ggplot</span>(grid_df, <span class="fu">aes</span>(rain_cwc, pred, <span class="at">group =</span> site_id)) <span class="sc">+</span></span>
+<span id="cb19-17"><a href="#cb19-17" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_line</span>(<span class="at">alpha =</span> <span class="fl">0.85</span>) <span class="sc">+</span></span>
+<span id="cb19-18"><a href="#cb19-18" aria-hidden="true" tabindex="-1"></a>  <span class="fu">labs</span>(</span>
+<span id="cb19-19"><a href="#cb19-19" aria-hidden="true" tabindex="-1"></a>    <span class="at">title =</span> <span class="st">"Random slopes: rainfall effect varies by site"</span>,</span>
+<span id="cb19-20"><a href="#cb19-20" aria-hidden="true" tabindex="-1"></a>    <span class="at">subtitle =</span> <span class="st">"Each line is the predicted within-site relationship for one site (temp_cwc fixed at 0)"</span>,</span>
+<span id="cb19-21"><a href="#cb19-21" aria-hidden="true" tabindex="-1"></a>    <span class="at">x =</span> <span class="st">"Rain anomaly within site (mm)"</span>,</span>
+<span id="cb19-22"><a href="#cb19-22" aria-hidden="true" tabindex="-1"></a>    <span class="at">y =</span> <span class="st">"Predicted log(nitrate)"</span></span>
+<span id="cb19-23"><a href="#cb19-23" aria-hidden="true" tabindex="-1"></a>  )</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="lab_mlm_START_files/figure-html/unnamed-chunk-19-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+</div>
+<p><strong>Q8.</strong> What does it mean if the random slope variance for <code>rain_cwc</code> is near 0? What does it mean if it is clearly &gt; 0?</p>
+<p><strong>Response:</strong> Near zero means that within-site rain differences aren’t that different. Greater than zero suggests that nitrate level responds to rainfall differently in different sites.</p>
+<hr>
+</section>
+<section id="model-8-cross-level-interaction-agriculture-moderates-within-effect" class="level3" data-number="1.8">
+<h3 data-number="1.8" class="anchored" data-anchor-id="model-8-cross-level-interaction-agriculture-moderates-within-effect"><span class="header-section-number">1.8</span> Model 8: Cross-level interaction (agriculture moderates within effect)</h3>
+<p>We now test whether slope heterogeneity is systematically related to agriculture:</p>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb20"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb20-1"><a href="#cb20-1" aria-hidden="true" tabindex="-1"></a>m8_cross_level <span class="ot">&lt;-</span> <span class="fu">lmer</span>(log_nitrate <span class="sc">~</span> rain_cwc <span class="sc">*</span> landuse_ag_cgm <span class="sc">+</span> rain_mean_site_cgm <span class="sc">+</span> temp_cwc <span class="sc">+</span> (<span class="dv">1</span> <span class="sc">+</span> rain_cwc <span class="sc">|</span> site_id),</span>
+<span id="cb20-2"><a href="#cb20-2" aria-hidden="true" tabindex="-1"></a>  <span class="at">data =</span> nitrate_df,</span>
+<span id="cb20-3"><a href="#cb20-3" aria-hidden="true" tabindex="-1"></a>  <span class="at">REML =</span> <span class="cn">TRUE</span>)</span>
+<span id="cb20-4"><a href="#cb20-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb20-5"><a href="#cb20-5" aria-hidden="true" tabindex="-1"></a><span class="fu">summ</span>(m8_cross_level, <span class="at">digits =</span> <span class="dv">3</span>, <span class="at">model.fit =</span> <span class="cn">FALSE</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output-display">
+<div class="table-responsive">
+<table class="table table-striped table-hover table-condensed caption-top table-sm small">
+<tbody>
+<tr class="odd">
+<td style="text-align: left; font-weight: bold;">Observations</td>
+<td style="text-align: right;">1080</td>
+</tr>
+<tr class="even">
+<td style="text-align: left; font-weight: bold;">Dependent variable</td>
+<td style="text-align: right;">log_nitrate</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left; font-weight: bold;">Type</td>
+<td style="text-align: right;">Mixed effects linear regression</td>
+</tr>
+</tbody>
+</table>
+</div>
+  
+<div class="table-responsive">
+<table class="table table-striped table-hover table-condensed caption-top table-sm small">
+<colgroup>
+<col style="width: 16%">
+<col style="width: 16%">
+<col style="width: 16%">
+<col style="width: 16%">
+<col style="width: 16%">
+<col style="width: 16%">
+</colgroup>
+<thead>
+<tr class="header">
+<th colspan="6" data-quarto-table-cell-role="th" style="text-align: center; border-bottom: hidden; padding-bottom: 0; padding-left: 3px; padding-right: 3px;"><div style="border-bottom: 1px solid #ddd; padding-bottom: 5px; ">
+Fixed Effects
+</div></th>
+</tr>
+<tr class="even">
+<th style="text-align: left;" data-quarto-table-cell-role="th"></th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">Est.</th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">S.E.</th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">t val.</th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">d.f.</th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">p</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left; font-weight: bold;">(Intercept)</td>
+<td style="text-align: right;">0.212</td>
+<td style="text-align: right;">0.057</td>
+<td style="text-align: right;">3.694</td>
+<td style="text-align: right;">56.780</td>
+<td style="text-align: right;">0.000</td>
+</tr>
+<tr class="even">
+<td style="text-align: left; font-weight: bold;">rain_cwc</td>
+<td style="text-align: right;">0.010</td>
+<td style="text-align: right;">0.003</td>
+<td style="text-align: right;">2.940</td>
+<td style="text-align: right;">59.322</td>
+<td style="text-align: right;">0.005</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left; font-weight: bold;">landuse_ag_cgm</td>
+<td style="text-align: right;">1.279</td>
+<td style="text-align: right;">0.308</td>
+<td style="text-align: right;">4.155</td>
+<td style="text-align: right;">56.980</td>
+<td style="text-align: right;">0.000</td>
+</tr>
+<tr class="even">
+<td style="text-align: left; font-weight: bold;">rain_mean_site_cgm</td>
+<td style="text-align: right;">-0.030</td>
+<td style="text-align: right;">0.008</td>
+<td style="text-align: right;">-3.907</td>
+<td style="text-align: right;">56.167</td>
+<td style="text-align: right;">0.000</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left; font-weight: bold;">temp_cwc</td>
+<td style="text-align: right;">-0.015</td>
+<td style="text-align: right;">0.004</td>
+<td style="text-align: right;">-3.950</td>
+<td style="text-align: right;">981.999</td>
+<td style="text-align: right;">0.000</td>
+</tr>
+<tr class="even">
+<td style="text-align: left; font-weight: bold;">rain_cwc:landuse_ag_cgm</td>
+<td style="text-align: right;">-0.013</td>
+<td style="text-align: right;">0.018</td>
+<td style="text-align: right;">-0.745</td>
+<td style="text-align: right;">55.376</td>
+<td style="text-align: right;">0.460</td>
+</tr>
+</tbody><tfoot>
+<tr class="odd">
+<td style="text-align: left; padding: 0;"><sup></sup> p values calculated using Satterthwaite d.f.</td>
+<td style="text-align: right;"></td>
+<td style="text-align: right;"></td>
+<td style="text-align: right;"></td>
+<td style="text-align: right;"></td>
+<td style="text-align: right;"></td>
+</tr>
+</tfoot>
+
+</table>
+</div>
+ 
+<div class="table-responsive">
+<table class="table table-striped table-hover table-condensed caption-top table-sm small">
+<colgroup>
+<col style="width: 33%">
+<col style="width: 33%">
+<col style="width: 33%">
+</colgroup>
+<thead>
+<tr class="header">
+<th colspan="3" data-quarto-table-cell-role="th" style="text-align: center; border-bottom: hidden; padding-bottom: 0; padding-left: 3px; padding-right: 3px;"><div style="border-bottom: 1px solid #ddd; padding-bottom: 5px; ">
+Random Effects
+</div></th>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">Group</th>
+<th data-quarto-table-cell-role="th">Parameter</th>
+<th data-quarto-table-cell-role="th">Std. Dev.</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>site_id</td>
+<td>(Intercept)</td>
+<td>0.420</td>
+</tr>
+<tr class="even">
+<td>site_id</td>
+<td>rain_cwc</td>
+<td>0.022</td>
+</tr>
+<tr class="odd">
+<td>Residual</td>
+<td></td>
+<td>0.627</td>
+</tr>
+</tbody>
+</table>
+</div>
+ 
+<div class="table-responsive">
+<table class="table table-striped table-hover table-condensed caption-top table-sm small">
+<colgroup>
+<col style="width: 33%">
+<col style="width: 33%">
+<col style="width: 33%">
+</colgroup>
+<thead>
+<tr class="header">
+<th colspan="3" data-quarto-table-cell-role="th" style="text-align: center; border-bottom: hidden; padding-bottom: 0; padding-left: 3px; padding-right: 3px;"><div style="border-bottom: 1px solid #ddd; padding-bottom: 5px; ">
+Grouping Variables
+</div></th>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">Group</th>
+<th data-quarto-table-cell-role="th"># groups</th>
+<th data-quarto-table-cell-role="th">ICC</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>site_id</td>
+<td>60</td>
+<td>0.309</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</div>
+</section>
+<section id="plot-predicted-within-site-relationship-at-lowavghigh-agriculture" class="level3" data-number="1.9">
+<h3 data-number="1.9" class="anchored" data-anchor-id="plot-predicted-within-site-relationship-at-lowavghigh-agriculture"><span class="header-section-number">1.9</span> Plot: predicted within-site relationship at low/avg/high agriculture</h3>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb21"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb21-1"><a href="#cb21-1" aria-hidden="true" tabindex="-1"></a><span class="fu">plot</span>(<span class="fu">ggpredict</span>(</span>
+<span id="cb21-2"><a href="#cb21-2" aria-hidden="true" tabindex="-1"></a>  m8_cross_level,</span>
+<span id="cb21-3"><a href="#cb21-3" aria-hidden="true" tabindex="-1"></a>  <span class="at">terms =</span> <span class="fu">c</span>(<span class="st">"rain_cwc [all]"</span>, <span class="st">"landuse_ag_cgm [-0.25, 0, 0.25]"</span>)</span>
+<span id="cb21-4"><a href="#cb21-4" aria-hidden="true" tabindex="-1"></a>)) <span class="sc">+</span></span>
+<span id="cb21-5"><a href="#cb21-5" aria-hidden="true" tabindex="-1"></a>  <span class="fu">labs</span>(</span>
+<span id="cb21-6"><a href="#cb21-6" aria-hidden="true" tabindex="-1"></a>    <span class="at">title =</span> <span class="st">"Cross-level interaction: agriculture moderates rain → nitrate"</span>,</span>
+<span id="cb21-7"><a href="#cb21-7" aria-hidden="true" tabindex="-1"></a>    <span class="at">subtitle =</span> <span class="st">"Lines show predicted within-site effect at different agriculture levels"</span>,</span>
+<span id="cb21-8"><a href="#cb21-8" aria-hidden="true" tabindex="-1"></a>    <span class="at">x =</span> <span class="st">"Rain anomaly within site (mm)"</span>,</span>
+<span id="cb21-9"><a href="#cb21-9" aria-hidden="true" tabindex="-1"></a>    <span class="at">y =</span> <span class="st">"Predicted log(nitrate)"</span></span>
+<span id="cb21-10"><a href="#cb21-10" aria-hidden="true" tabindex="-1"></a>  )</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="lab_mlm_START_files/figure-html/unnamed-chunk-21-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+</div>
+<hr>
+</section>
+<section id="wrap-up-what-to-look-for-in-environmental-science-papers" class="level3" data-number="1.10">
+<h3 data-number="1.10" class="anchored" data-anchor-id="wrap-up-what-to-look-for-in-environmental-science-papers"><span class="header-section-number">1.10</span> 11. Wrap-up: what to look for in environmental science papers</h3>
+<p>When you read a “mixed effects” Methods section, look for:</p>
+<ol type="1">
+<li><strong>Levels</strong> (What is nested in what?)<br>
+</li>
+<li><strong>Random effects structure</strong> (random intercepts only? random slopes?)<br>
+</li>
+<li>Whether they separated <strong>within vs between</strong> (or reported a potentially smushed slope)<br>
+</li>
+<li>Whether fixed effects are interpreted on the correct scale (log vs raw)</li>
+</ol>
+<p><strong>Take-home:</strong> In clustered data, “the effect of X” is often <em>not one number</em> unless you are explicit about whether you mean within-site variation, between-site differences, or both.</p>
+<hr>
+</section>
+</section>
+
+</main>
+<!-- /main column -->
+<script id="quarto-html-after-body" type="application/javascript">
+  window.document.addEventListener("DOMContentLoaded", function (event) {
+    const icon = "";
+    const anchorJS = new window.AnchorJS();
+    anchorJS.options = {
+      placement: 'right',
+      icon: icon
+    };
+    anchorJS.add('.anchored');
+    const isCodeAnnotation = (el) => {
+      for (const clz of el.classList) {
+        if (clz.startsWith('code-annotation-')) {                     
+          return true;
+        }
+      }
+      return false;
+    }
+    const onCopySuccess = function(e) {
+      // button target
+      const button = e.trigger;
+      // don't keep focus
+      button.blur();
+      // flash "checked"
+      button.classList.add('code-copy-button-checked');
+      var currentTitle = button.getAttribute("title");
+      button.setAttribute("title", "Copied!");
+      let tooltip;
+      if (window.bootstrap) {
+        button.setAttribute("data-bs-toggle", "tooltip");
+        button.setAttribute("data-bs-placement", "left");
+        button.setAttribute("data-bs-title", "Copied!");
+        tooltip = new bootstrap.Tooltip(button, 
+          { trigger: "manual", 
+            customClass: "code-copy-button-tooltip",
+            offset: [0, -8]});
+        tooltip.show();    
+      }
+      setTimeout(function() {
+        if (tooltip) {
+          tooltip.hide();
+          button.removeAttribute("data-bs-title");
+          button.removeAttribute("data-bs-toggle");
+          button.removeAttribute("data-bs-placement");
+        }
+        button.setAttribute("title", currentTitle);
+        button.classList.remove('code-copy-button-checked');
+      }, 1000);
+      // clear code selection
+      e.clearSelection();
+    }
+    const getTextToCopy = function(trigger) {
+      const outerScaffold = trigger.parentElement.cloneNode(true);
+      const codeEl = outerScaffold.querySelector('code');
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+    }
+    const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+      text: getTextToCopy
+    });
+    clipboard.on('success', onCopySuccess);
+    if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+      const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+        text: getTextToCopy,
+        container: window.document.getElementById('quarto-embedded-source-code-modal')
+      });
+      clipboardModal.on('success', onCopySuccess);
+    }
+      var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+      var mailtoRegex = new RegExp(/^mailto:/);
+        var filterRegex = new RegExp('/' + window.location.host + '/');
+      var isInternal = (href) => {
+          return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+      }
+      // Inspect non-navigation links and adorn them if external
+     var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+      for (var i=0; i<links.length; i++) {
+        const link = links[i];
+        if (!isInternal(link.href)) {
+          // undo the damage that might have been done by quarto-nav.js in the case of
+          // links that we want to consider external
+          if (link.dataset.originalHref !== undefined) {
+            link.href = link.dataset.originalHref;
+          }
+        }
+      }
+    function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+      const config = {
+        allowHTML: true,
+        maxWidth: 500,
+        delay: 100,
+        arrow: false,
+        appendTo: function(el) {
+            return el.parentElement;
+        },
+        interactive: true,
+        interactiveBorder: 10,
+        theme: 'quarto',
+        placement: 'bottom-start',
+      };
+      if (contentFn) {
+        config.content = contentFn;
+      }
+      if (onTriggerFn) {
+        config.onTrigger = onTriggerFn;
+      }
+      if (onUntriggerFn) {
+        config.onUntrigger = onUntriggerFn;
+      }
+      window.tippy(el, config); 
+    }
+    const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+    for (var i=0; i<noterefs.length; i++) {
+      const ref = noterefs[i];
+      tippyHover(ref, function() {
+        // use id or data attribute instead here
+        let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+        try { href = new URL(href).hash; } catch {}
+        const id = href.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note) {
+          return note.innerHTML;
+        } else {
+          return "";
+        }
+      });
+    }
+    const xrefs = window.document.querySelectorAll('a.quarto-xref');
+    const processXRef = (id, note) => {
+      // Strip column container classes
+      const stripColumnClz = (el) => {
+        el.classList.remove("page-full", "page-columns");
+        if (el.children) {
+          for (const child of el.children) {
+            stripColumnClz(child);
+          }
+        }
+      }
+      stripColumnClz(note)
+      if (id === null || id.startsWith('sec-')) {
+        // Special case sections, only their first couple elements
+        const container = document.createElement("div");
+        if (note.children && note.children.length > 2) {
+          container.appendChild(note.children[0].cloneNode(true));
+          for (let i = 1; i < note.children.length; i++) {
+            const child = note.children[i];
+            if (child.tagName === "P" && child.innerText === "") {
+              continue;
+            } else {
+              container.appendChild(child.cloneNode(true));
+              break;
+            }
+          }
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(container);
+          }
+          return container.innerHTML
+        } else {
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(note);
+          }
+          return note.innerHTML;
+        }
+      } else {
+        // Remove any anchor links if they are present
+        const anchorLink = note.querySelector('a.anchorjs-link');
+        if (anchorLink) {
+          anchorLink.remove();
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        if (note.classList.contains("callout")) {
+          return note.outerHTML;
+        } else {
+          return note.innerHTML;
+        }
+      }
+    }
+    for (var i=0; i<xrefs.length; i++) {
+      const xref = xrefs[i];
+      tippyHover(xref, undefined, function(instance) {
+        instance.disable();
+        let url = xref.getAttribute('href');
+        let hash = undefined; 
+        if (url.startsWith('#')) {
+          hash = url;
+        } else {
+          try { hash = new URL(url).hash; } catch {}
+        }
+        if (hash) {
+          const id = hash.replace(/^#\/?/, "");
+          const note = window.document.getElementById(id);
+          if (note !== null) {
+            try {
+              const html = processXRef(id, note.cloneNode(true));
+              instance.setContent(html);
+            } finally {
+              instance.enable();
+              instance.show();
+            }
+          } else {
+            // See if we can fetch this
+            fetch(url.split('#')[0])
+            .then(res => res.text())
+            .then(html => {
+              const parser = new DOMParser();
+              const htmlDoc = parser.parseFromString(html, "text/html");
+              const note = htmlDoc.getElementById(id);
+              if (note !== null) {
+                const html = processXRef(id, note);
+                instance.setContent(html);
+              } 
+            }).finally(() => {
+              instance.enable();
+              instance.show();
+            });
+          }
+        } else {
+          // See if we can fetch a full url (with no hash to target)
+          // This is a special case and we should probably do some content thinning / targeting
+          fetch(url)
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.querySelector('main.content');
+            if (note !== null) {
+              // This should only happen for chapter cross references
+              // (since there is no id in the URL)
+              // remove the first header
+              if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+                note.children[0].remove();
+              }
+              const html = processXRef(null, note);
+              instance.setContent(html);
+            } 
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      }, function(instance) {
+      });
+    }
+        let selectedAnnoteEl;
+        const selectorForAnnotation = ( cell, annotation) => {
+          let cellAttr = 'data-code-cell="' + cell + '"';
+          let lineAttr = 'data-code-annotation="' +  annotation + '"';
+          const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+          return selector;
+        }
+        const selectCodeLines = (annoteEl) => {
+          const doc = window.document;
+          const targetCell = annoteEl.getAttribute("data-target-cell");
+          const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+          const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+          const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+          const lineIds = lines.map((line) => {
+            return targetCell + "-" + line;
+          })
+          let top = null;
+          let height = null;
+          let parent = null;
+          if (lineIds.length > 0) {
+              //compute the position of the single el (top and bottom and make a div)
+              const el = window.document.getElementById(lineIds[0]);
+              top = el.offsetTop;
+              height = el.offsetHeight;
+              parent = el.parentElement.parentElement;
+            if (lineIds.length > 1) {
+              const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+              const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+              height = bottom - top;
+            }
+            if (top !== null && height !== null && parent !== null) {
+              // cook up a div (if necessary) and position it 
+              let div = window.document.getElementById("code-annotation-line-highlight");
+              if (div === null) {
+                div = window.document.createElement("div");
+                div.setAttribute("id", "code-annotation-line-highlight");
+                div.style.position = 'absolute';
+                parent.appendChild(div);
+              }
+              div.style.top = top - 2 + "px";
+              div.style.height = height + 4 + "px";
+              div.style.left = 0;
+              let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+              if (gutterDiv === null) {
+                gutterDiv = window.document.createElement("div");
+                gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+                gutterDiv.style.position = 'absolute';
+                const codeCell = window.document.getElementById(targetCell);
+                const gutter = codeCell.querySelector('.code-annotation-gutter');
+                gutter.appendChild(gutterDiv);
+              }
+              gutterDiv.style.top = top - 2 + "px";
+              gutterDiv.style.height = height + 4 + "px";
+            }
+            selectedAnnoteEl = annoteEl;
+          }
+        };
+        const unselectCodeLines = () => {
+          const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+          elementsIds.forEach((elId) => {
+            const div = window.document.getElementById(elId);
+            if (div) {
+              div.remove();
+            }
+          });
+          selectedAnnoteEl = undefined;
+        };
+          // Handle positioning of the toggle
+      window.addEventListener(
+        "resize",
+        throttle(() => {
+          elRect = undefined;
+          if (selectedAnnoteEl) {
+            selectCodeLines(selectedAnnoteEl);
+          }
+        }, 10)
+      );
+      function throttle(fn, ms) {
+      let throttle = false;
+      let timer;
+        return (...args) => {
+          if(!throttle) { // first call gets through
+              fn.apply(this, args);
+              throttle = true;
+          } else { // all the others get throttled
+              if(timer) clearTimeout(timer); // cancel #2
+              timer = setTimeout(() => {
+                fn.apply(this, args);
+                timer = throttle = false;
+              }, ms);
+          }
+        };
+      }
+        // Attach click handler to the DT
+        const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+        for (const annoteDlNode of annoteDls) {
+          annoteDlNode.addEventListener('click', (event) => {
+            const clickedEl = event.target;
+            if (clickedEl !== selectedAnnoteEl) {
+              unselectCodeLines();
+              const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+              if (activeEl) {
+                activeEl.classList.remove('code-annotation-active');
+              }
+              selectCodeLines(clickedEl);
+              clickedEl.classList.add('code-annotation-active');
+            } else {
+              // Unselect the line
+              unselectCodeLines();
+              clickedEl.classList.remove('code-annotation-active');
+            }
+          });
+        }
+    const findCites = (el) => {
+      const parentEl = el.parentElement;
+      if (parentEl) {
+        const cites = parentEl.dataset.cites;
+        if (cites) {
+          return {
+            el,
+            cites: cites.split(' ')
+          };
+        } else {
+          return findCites(el.parentElement)
+        }
+      } else {
+        return undefined;
+      }
+    };
+    var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+    for (var i=0; i<bibliorefs.length; i++) {
+      const ref = bibliorefs[i];
+      const citeInfo = findCites(ref);
+      if (citeInfo) {
+        tippyHover(citeInfo.el, function() {
+          var popup = window.document.createElement('div');
+          citeInfo.cites.forEach(function(cite) {
+            var citeDiv = window.document.createElement('div');
+            citeDiv.classList.add('hanging-indent');
+            citeDiv.classList.add('csl-entry');
+            var biblioDiv = window.document.getElementById('ref-' + cite);
+            if (biblioDiv) {
+              citeDiv.innerHTML = biblioDiv.innerHTML;
+            }
+            popup.appendChild(citeDiv);
+          });
+          return popup.innerHTML;
+        });
+      }
+    }
+  });
+  </script>
+</div> <!-- /content -->
+
+
+
+
+</body></html>
